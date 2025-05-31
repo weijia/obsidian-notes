@@ -45,18 +45,6 @@ const saveFile = async () => {
 
 <template>
   <main class="home-container">
-    <div class="file-tree">
-      <FileTree v-model="currentFile" @update="onFileSelect" />
-    </div>
-    <div class="editor-container">
-      <div v-if="error" class="error-message">
-        {{ error }}
-      </div>
-      <textarea v-model="content" class="markdown-editor" placeholder="Start writing your note here..."></textarea>
-      <button @click="saveFile" :disabled="isLoading || !currentFile" class="save-button">
-        {{ isLoading ? 'Saving...' : 'Save' }}
-      </button>
-    </div>
   </main>
 </template>
 

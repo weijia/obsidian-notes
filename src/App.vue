@@ -1,5 +1,8 @@
 <script setup>
 import { ref, computed, provide, inject, onMounted } from 'vue'
+import DOMPurify from 'dompurify'
+
+const isPreview = ref(false)
 import { createClient } from 'webdav'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
@@ -125,10 +128,19 @@ const navigateToConfig = () => {
       <div v-if="$route.path === '/'" class="editor">
         <div class="editor-header">
           <span>{{ activeNote }}</span>
-          <button @click="saveNote" class="save-btn">Save</button>
+          <div>
+            <button @click="isPreview = !isPreview" class="preview-btn">
+              {{ isPreview ? 'Edit' : 'Preview' }}
+            </button>
+            <button @click="saveNote" class="save-btn">Save</button>
+          </div>
         </div>
-        <textarea v-model="markdownContent" class="markdown-editor" placeholder="Write your markdown here..."
-          @input="saveNote"></textarea>
+        <div class="editor-content">
+          <textarea v-show="!isPreview" v-model="markdownContent" class="markdown-editor"
+            placeholder="Write your markdown here..." @input="saveNote"
+            style="width: 100%; height: 100%; min-height: calc(100vh - 100px); padding: 1rem; box-sizing: border-box;"></textarea>
+          <div v-show="isPreview" class="markdown-preview" v-html="markdownPreview"></div>
+        </div>
       </div>
     </div>
 
@@ -251,5 +263,38 @@ const navigateToConfig = () => {
   padding-left: 15px;
   color: #666;
   margin-left: 0;
+}
+</style>
+
+<style scoped>
+.editor-header>div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-btn {
+  padding: 0.25rem 0.5rem;
+  background-color: var(--color-background-mute);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.preview-btn:hover {
+  background-color: var(--color-background-soft);
+}
+
+.markdown-preview {
+  padding: 1rem;
+  height: calc(100% - 3rem);
+  overflow-y: auto;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 0 0 8px 8px;
+}
+
+.editor-content {
+  height: calc(100% - 3rem);
+  position: relative;
 }
 </style>
