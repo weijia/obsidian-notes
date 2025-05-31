@@ -1,6 +1,9 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, inject } from 'vue'
 import { useWebDAVStore } from '@/stores/webdav'
+
+// 显式声明可能的注入依赖
+const appContext = inject('appContext', null)
 
 const props = defineProps({
   modelValue: String
@@ -66,8 +69,16 @@ const loadFiles = async () => {
 }
 
 const selectFile = (file) => {
-  emit('update:modelValue', file.path)
-  emit('update', file.path)
+  try {
+    if (appContext) {
+      // 如果有注入的上下文，可以在这里使用
+      console.log('App context available:', appContext)
+    }
+    emit('update:modelValue', file.path)
+    emit('update', file.path)
+  } catch (error) {
+    console.error('Error selecting file:', error)
+  }
 }
 
 onMounted(loadFiles)

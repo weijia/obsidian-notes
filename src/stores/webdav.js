@@ -67,25 +67,47 @@ export const useWebDAVStore = defineStore('webdav', {
     },
 
     async readFile(filePath) {
-      if (!this.isConnected) return
+      if (!this.isConnected || !this.client) {
+        throw new Error('WebDAV客户端未连接')
+      }
+
+      // 确保路径以basePath开头
+      const normalizedPath = filePath.startsWith(this.basePath)
+        ? filePath
+        : `${this.basePath}/${filePath.replace(/^\//, '')}`
 
       try {
-        const content = await this.client.getFileContents(filePath, { format: 'text' })
+        // 兼容不同版本的webdav客户端
+        const content = await (this.client.getFileContents || this.client.getFileContentsStream)(
+          normalizedPath,
+          { format: 'text' },
+        )
         return content
       } catch (error) {
-        console.error('读取文件失败:', error)
+        console.error(`读取文件失败(${normalizedPath}):`, error)
         throw error
       }
     },
 
     async writeFile(filePath, content) {
-      if (!this.isConnected) return
+      if (!this.isConnected || !this.client) {
+        throw new Error('WebDAV客户端未连接')
+      }
+
+      // 确保路径以basePath开头
+      const normalizedPath = filePath.startsWith(this.basePath)
+        ? filePath
+        : `${this.basePath}/${filePath.replace(/^\//, '')}`
 
       try {
-        await this.client.putFileContents(filePath, content)
+        // 兼容不同版本的webdav客户端
+        await (this.client.putFileContents || this.client.putFileContentsStream)(
+          normalizedPath,
+          content,
+        )
         return true
       } catch (error) {
-        console.error('写入文件失败:', error)
+        console.error(`写入文件失败(${normalizedPath}):`, error)
         throw error
       }
     },

@@ -7,7 +7,6 @@ import { marked } from 'marked'
 
 const activeNote = ref('Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
-
 // Sample notes data
 const notes = ref({
   'Welcome.md': '# Welcome to Obsidian-like Notes\n\nStart writing your notes here...',
@@ -26,10 +25,9 @@ const updateContent = async (newNote) => {
   }
 
   // Try to fetch from WebDAV if available
-  const webdav = inject('webdav')
-  if (webdav) {
+  if (webdavStore.client) {
     try {
-      const content = await webdav.getFileContents(newNote)
+      const content = await webdavStore.readFile(newNote)
       notes.value[newNote] = content
       markdownContent.value = content
     } catch (e) {
