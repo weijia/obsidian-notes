@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, inject } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useWebDAVStore } from '@/stores/webdav'
 
 const props = defineProps({
   modelValue: String
@@ -7,11 +8,20 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'update'])
 
-const files = ref([])
+const webdav = useWebDAVStore()
 const isLoading = ref(false)
 const error = ref(null)
 
-const webdavClient = inject('webdav')
+const files = computed(() => {
+  if (!webdav.isConnected) return []
+
+  return webdav.files
+    .filter(item => item.type === 'file' && item.basename.endsWith('.md'))
+    .map(item => ({
+      name: item.basename,
+      path: item.filename
+    }))
+})
 
 const loadFiles = async () => {
   try {
@@ -24,18 +34,12 @@ const loadFiles = async () => {
       return
     }
 
-    if (!webdavClient) {
-      error.value = 'WebDAV client not available'
+    if (!webdav.isConnected) {
+      error.value = 'WebDAV connection not established'
       return
     }
 
-    const items = await webdavClient.getDirectoryContents(config.directory)
-    files.value = items
-      .filter(item => item.type === 'file' && item.basename.endsWith('.md'))
-      .map(item => ({
-        name: item.basename,
-        path: `${config.directory}/${item.basename}`
-      }))
+    await webdav.getDirectoryContents(config.directory)
 
     if (files.value.length > 0 && !props.modelValue) {
       emit('update:modelValue', files.value[0].path)

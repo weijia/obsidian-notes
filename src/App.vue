@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, provide, inject } from 'vue'
+import { ref, computed, provide, inject, onMounted } from 'vue'
 import { createClient } from 'webdav'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
@@ -53,24 +53,29 @@ const markdownPreview = computed(() => {
   return marked(markdownContent.value)
 })
 
-// Initialize and provide WebDAV client
-let webdavClient = null
-try {
-  const savedConfig = localStorage.getItem('webdavConfig')
-  if (savedConfig) {
-    const config = JSON.parse(savedConfig)
-    if (config.serverUrl && config.username && config.password) {
-      webdavClient = createClient(config.serverUrl, {
-        username: config.username,
-        password: config.password
-      })
-      console.log('WebDAV client initialized with saved configuration')
+import { useWebDAVStore } from '@/stores/webdav'
+const webdavStore = useWebDAVStore()
+
+// Initialize WebDAV connection from saved config
+onMounted(async () => {
+  try {
+    const savedConfig = localStorage.getItem('webdavConfig')
+    if (savedConfig) {
+      const config = JSON.parse(savedConfig)
+      if (config.serverUrl && config.username && config.password) {
+        await webdavStore.connect(
+          config.serverUrl,
+          config.username,
+          config.password
+        )
+      }
     }
+  } catch (e) {
+    console.error('Failed to initialize WebDAV connection:', e)
   }
-} catch (e) {
-  console.error('Failed to initialize WebDAV client:', e)
-}
-provide('webdav', webdavClient)
+})
+
+provide('webdav', computed(() => webdavStore.client))
 
 const router = useRouter()
 const navigateToConfig = () => {
