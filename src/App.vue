@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { RouterView } from 'vue-router'
+import { ref, computed, provide, inject } from 'vue'
+import { createClient } from 'webdav'
+import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
 import { marked } from 'marked'
 
@@ -15,9 +16,29 @@ const notes = ref({
 })
 
 // Update content when active note changes
-const updateContent = (newNote) => {
+const updateContent = async (newNote) => {
   activeNote.value = newNote
-  markdownContent.value = notes.value[newNote] || ''
+
+  // First check local notes
+  if (notes.value[newNote]) {
+    markdownContent.value = notes.value[newNote]
+    return
+  }
+
+  // Try to fetch from WebDAV if available
+  const webdav = inject('webdav')
+  if (webdav) {
+    try {
+      const content = await webdav.getFileContents(newNote)
+      notes.value[newNote] = content
+      markdownContent.value = content
+    } catch (e) {
+      console.error('Failed to load from WebDAV:', e)
+      markdownContent.value = `# Error loading ${newNote}\n\nFile not found locally or on WebDAV server`
+    }
+  } else {
+    markdownContent.value = notes.value[newNote] || `# ${newNote}\n\nFile not found`
+  }
 }
 
 // Save content when edited
@@ -31,29 +52,80 @@ const saveNote = () => {
 const markdownPreview = computed(() => {
   return marked(markdownContent.value)
 })
+
+// Initialize and provide WebDAV client
+let webdavClient = null
+try {
+  const savedConfig = localStorage.getItem('webdavConfig')
+  if (savedConfig) {
+    const config = JSON.parse(savedConfig)
+    if (config.serverUrl && config.username && config.password) {
+      webdavClient = createClient(config.serverUrl, {
+        username: config.username,
+        password: config.password
+      })
+      console.log('WebDAV client initialized with saved configuration')
+    }
+  }
+} catch (e) {
+  console.error('Failed to initialize WebDAV client:', e)
+}
+provide('webdav', webdavClient)
+
+const router = useRouter()
+const navigateToConfig = () => {
+  console.log('Configure button clicked - router available:', !!router)
+  if (!router) {
+    console.error('Router is not available')
+    return
+  }
+  try {
+    console.log('Current route:', router.currentRoute.value.path)
+    router.push('/config').then(() => {
+      console.log('Navigation successful')
+    }).catch(err => {
+      console.error('Navigation failed:', err)
+    })
+  } catch (error) {
+    console.error('Navigation error:', error)
+  }
+}
 </script>
 
 <template>
   <div class="app-container">
     <!-- Left sidebar - File navigation -->
     <div class="sidebar">
-      <FileTree v-model:activeNote="activeNote" @update:modelValue="updateContent" />
-    </div>
-
-    <!-- Main editor area -->
-    <div class="editor">
-      <div class="editor-header">
-        <span>{{ activeNote }}</span>
-        <button @click="saveNote" class="save-btn">Save</button>
+      <div class="sidebar-header"
+        style="padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <span>Notes</span>
+        <button @click="navigateToConfig" class="config-btn"
+          style="padding: 5px 10px; background: #646cff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          Configure
+        </button>
       </div>
-      <textarea v-model="markdownContent" class="markdown-editor" placeholder="Write your markdown here..."
-        @input="saveNote"></textarea>
+      <FileTree v-model="activeNote" @update="updateContent" />
     </div>
 
-    <!-- Right sidebar - Preview -->
-    <div class="preview">
-      <div class="markdown-preview" v-html="markdownPreview"></div>
+    <!-- Main content area -->
+    <div class="main-content">
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+
+      <!-- Editor (shown only when route is home) -->
+      <div v-if="$route.path === '/'" class="editor">
+        <div class="editor-header">
+          <span>{{ activeNote }}</span>
+          <button @click="saveNote" class="save-btn">Save</button>
+        </div>
+        <textarea v-model="markdownContent" class="markdown-editor" placeholder="Write your markdown here..."
+          @input="saveNote"></textarea>
+      </div>
     </div>
+
   </div>
 
 </template>
@@ -73,10 +145,30 @@ const markdownPreview = computed(() => {
   overflow-y: auto;
 }
 
-.editor {
+.main-content {
   flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .editor-header {
@@ -115,15 +207,13 @@ const markdownPreview = computed(() => {
   color: #333;
 }
 
-.preview {
-  width: 300px;
-  background-color: #f9f9f9;
-  border-left: 1px solid #ddd;
-  overflow-y: auto;
-  padding: 15px;
+.main-content {
+  flex: 1 1 100%;
+  position: relative;
+  overflow: hidden;
 }
 
-.markdown-preview {
+.editor {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.6;
   color: #333;

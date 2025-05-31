@@ -1,9 +1,9 @@
 <script setup>
-import TheWelcome from '../components/TheWelcome.vue'
+// Home view content can be added here later
 </script>
 
 <template>
   <main>
-    <TheWelcome />
+    <!-- Main content will go here -->
   </main>
 </template>
