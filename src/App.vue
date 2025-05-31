@@ -63,11 +63,14 @@ onMounted(async () => {
     if (savedConfig) {
       const config = JSON.parse(savedConfig)
       if (config.serverUrl && config.username && config.password) {
-        await webdavStore.connect(
+        const connected = await webdavStore.connect(
           config.serverUrl,
           config.username,
           config.password
         )
+        if (connected) {
+          await webdavStore.getDirectoryContents(webdavStore.currentPath)
+        }
       }
     }
   } catch (e) {

@@ -11,7 +11,8 @@ export const useWebDAVStore = defineStore('webdav', {
       serverUrl: savedConfig.serverUrl || '',
       username: savedConfig.username || '',
       password: savedConfig.password || '',
-      currentPath: '/',
+      basePath: '/obsidian', // 限制基础路径
+      currentPath: '/obsidian',
       files: [],
     }
   },
@@ -35,10 +36,11 @@ export const useWebDAVStore = defineStore('webdav', {
             serverUrl,
             username,
             password,
+            basePath: this.basePath,
           }),
         )
 
-        await this.getDirectoryContents('/')
+        await this.getDirectoryContents(this.basePath)
         return true
       } catch (error) {
         console.error('WebDAV连接失败:', error)
@@ -47,13 +49,16 @@ export const useWebDAVStore = defineStore('webdav', {
       }
     },
 
-    async getDirectoryContents(path = '/') {
+    async getDirectoryContents(path = this.basePath) {
       if (!this.isConnected) return
 
+      // 确保路径在basePath范围内
+      const fullPath = path.startsWith(this.basePath) ? path : this.basePath
+
       try {
-        const contents = await this.client.getDirectoryContents(path)
+        const contents = await this.client.getDirectoryContents(fullPath)
         this.files = contents.filter((item) => item.basename !== '.DS_Store')
-        this.currentPath = path
+        this.currentPath = fullPath
         return this.files
       } catch (error) {
         console.error('获取目录内容失败:', error)

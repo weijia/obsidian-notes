@@ -13,14 +13,27 @@ const isLoading = ref(false)
 const error = ref(null)
 
 const files = computed(() => {
-  if (!webdav.isConnected) return []
+  if (!webdav.isConnected) {
+    console.log('Not connected to WebDAV')
+    return []
+  }
 
-  return webdav.files
-    .filter(item => item.type === 'file' && item.basename.endsWith('.md'))
+  const filteredFiles = webdav.files
+    .filter(item => {
+      const isMdFile = item.type === 'file' && item.basename.endsWith('.md')
+      if (!isMdFile) {
+        console.log('Skipping non-md file:', item.basename)
+      }
+      return true
+      // return isMdFile
+    })
     .map(item => ({
       name: item.basename,
       path: item.filename
     }))
+
+  console.log('Filtered files:', filteredFiles)
+  return filteredFiles
 })
 
 const loadFiles = async () => {
