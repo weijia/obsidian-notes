@@ -49,16 +49,40 @@ export const useWebDAVStore = defineStore('webdav', {
       }
     },
 
-    async getDirectoryContents(path = this.basePath) {
-      if (!this.isConnected) return
+    async ensureConnected() {
+      if (!this.isConnected && this.serverUrl) {
+        console.log('尝试自动连接到WebDAV服务器...')
+        try {
+          await this.connect(this.serverUrl, this.username, this.password)
+          return true
+        } catch (error) {
+          console.error('自动连接失败:', error)
+          return false
+        }
+      }
+      return this.isConnected
+    },
 
-      // 确保路径在basePath范围内
-      const fullPath = path.startsWith(this.basePath) ? path : this.basePath
+    async getDirectoryContents(path = this.basePath) {
+      if (!(await this.ensureConnected())) {
+        console.warn('无法获取目录内容: 未连接到WebDAV服务器')
+        return
+      }
+
+      // 规范化路径
+      let fullPath = path
+      if (!path.startsWith('/')) {
+        fullPath = `/${path}`
+      }
+
+      console.log('Getting directory contents for:', fullPath)
 
       try {
         const contents = await this.client.getDirectoryContents(fullPath)
         this.files = contents.filter((item) => item.basename !== '.DS_Store')
         this.currentPath = fullPath
+        console.log('Updated currentPath to:', this.currentPath)
+        console.log('Found files:', this.files.length)
         return this.files
       } catch (error) {
         console.error('获取目录内容失败:', error)
