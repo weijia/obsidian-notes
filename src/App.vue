@@ -42,12 +42,27 @@ const updateContent = async (newNote) => {
   }
 }
 
-// Save content when edited
-const saveNote = () => {
+// Save content locally
+const saveLocalNote = () => {
   if (activeNote.value) {
     notes.value[activeNote.value] = markdownContent.value
   }
 }
+
+// Save content to WebDAV
+const saveToWebDAV = async () => {
+  if (!activeNote.value || !webdavStore.isConnected) return
+
+  try {
+    await webdavStore.writeFile(activeNote.value, markdownContent.value)
+    console.log('Successfully saved to WebDAV')
+  } catch (e) {
+    console.error('Failed to save to WebDAV:', e)
+  }
+}
+
+// Save content when edited (only locally)
+const saveNote = saveLocalNote
 
 // Markdown preview
 const markdownPreview = computed(() => {
@@ -132,7 +147,7 @@ const navigateToConfig = () => {
             <button @click="isPreview = !isPreview" class="preview-btn">
               {{ isPreview ? 'Edit' : 'Preview' }}
             </button>
-            <button @click="saveNote" class="save-btn">Save</button>
+            <button @click="() => { saveLocalNote(); saveToWebDAV(); }" class="save-btn">Save</button>
           </div>
         </div>
         <div class="editor-content">
