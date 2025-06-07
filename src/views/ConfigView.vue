@@ -9,7 +9,7 @@ const config = ref({
   serverUrl: '',
   username: '',
   password: '',
-  directory: '/notes'
+  directory: '/obsidian'
 })
 
 onMounted(() => {
@@ -21,7 +21,7 @@ onMounted(() => {
         serverUrl: parsedConfig.serverUrl || '',
         username: parsedConfig.username || '',
         password: parsedConfig.password || '',
-        directory: parsedConfig.directory || '/notes'
+        directory: parsedConfig.directory || '/obsidian'
       }
     }
   } catch (e) {

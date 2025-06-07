@@ -128,7 +128,9 @@ const navigateToConfig = () => {
           Configure
         </button>
       </div>
-      <FileTree v-model="activeNote" @update="updateContent" />
+      <div class="sidebar-tree">
+        <FileTree v-model="activeNote" @update="updateContent" />
+      </div>
     </div>
 
     <!-- Main content area -->
@@ -175,7 +177,20 @@ const navigateToConfig = () => {
   background-color: #1e1e1e;
   color: #d4d4d4;
   border-right: 1px solid #333;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden; /* 禁止 sidebar 自己滚动 */
+}
+
+.sidebar-header {
+  flex-shrink: 0;
+}
+
+.sidebar-tree {
+  flex: 1 1 auto;
+  overflow-y: auto; /* 只让 FileTree 区域滚动 */
+  min-height: 0;    /* 兼容 flex 布局下的滚动 */
 }
 
 .main-content {
