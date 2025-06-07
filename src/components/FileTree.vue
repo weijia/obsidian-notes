@@ -32,7 +32,8 @@ const files = computed(() => {
     })
     .map(item => ({
       name: item.basename,
-      path: item.filename
+      path: item.filename,
+      type: item.type // 保留原始类型信息
     }))
 
   console.log('Filtered files:', filteredFiles)
