@@ -1,12 +1,25 @@
 <script setup>
-import { ref, computed, provide, inject, onMounted } from 'vue'
+import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue'
 import DOMPurify from 'dompurify'
-
-const isPreview = ref(false)
 import { createClient } from 'webdav'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
 import { marked } from 'marked'
+
+// TipTap 编辑器相关导入
+import { Editor, EditorContent, useEditor } from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
+import CodeBlock from '@tiptap/extension-code-block'
+import Placeholder from '@tiptap/extension-placeholder'
+
+// Turndown 用于将HTML转换为Markdown
+import TurndownService from 'turndown'
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  codeBlockStyle: 'fenced'
+})
 
 const activeNote = ref('Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
@@ -17,6 +30,38 @@ const notes = ref({
   'Features.md': '# Features\n\n- Markdown editing\n- Live preview\n- File navigation'
 })
 
+// TipTap 编辑器实例
+const editor = useEditor({
+  content: markdownContent.value,
+  extensions: [
+    StarterKit,
+    Link.configure({
+      openOnClick: false,
+    }),
+    Image,
+    CodeBlock,
+    Placeholder.configure({
+      placeholder: '开始编写您的笔记...',
+    }),
+  ],
+  onUpdate: ({ editor }) => {
+    // 将编辑器内容转换为HTML，然后使用turndown转换为Markdown
+    const html = editor.getHTML()
+    markdownContent.value = turndownService.turndown(html)
+    saveLocalNote()
+  },
+  editorProps: {
+    attributes: {
+      class: 'wysiwyg-editor',
+    },
+  },
+})
+
+// 在组件卸载前销毁编辑器
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+})
+
 // Update content when active note changes
 const updateContent = async (newNote) => {
   activeNote.value = newNote
@@ -24,6 +69,9 @@ const updateContent = async (newNote) => {
   // First check local notes
   if (notes.value[newNote]) {
     markdownContent.value = notes.value[newNote]
+    // 将Markdown转换为HTML，然后设置为编辑器内容
+    const html = marked(notes.value[newNote])
+    editor.value?.commands.setContent(html)
     return
   }
 
@@ -33,12 +81,23 @@ const updateContent = async (newNote) => {
       const content = await webdavStore.readFile(newNote)
       notes.value[newNote] = content
       markdownContent.value = content
+      // 将Markdown转换为HTML，然后设置为编辑器内容
+      const html = marked(content)
+      editor.value?.commands.setContent(html)
     } catch (e) {
-      console.error('Failed to load from WebDAV:', e)
-      markdownContent.value = `# Error loading ${newNote}\n\nFile not found locally or on WebDAV server`
+      console.error('从WebDAV加载失败:', e)
+      const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或WebDAV服务器上未找到`
+      markdownContent.value = errorContent
+      // 将Markdown转换为HTML，然后设置为编辑器内容
+      const html = marked(errorContent)
+      editor.value?.commands.setContent(html)
     }
   } else {
-    markdownContent.value = notes.value[newNote] || `# ${newNote}\n\nFile not found`
+    const notFoundContent = notes.value[newNote] || `# ${newNote}\n\n文件未找到`
+    markdownContent.value = notFoundContent
+    // 将Markdown转换为HTML，然后设置为编辑器内容
+    const html = marked(notFoundContent)
+    editor.value?.commands.setContent(html)
   }
 }
 
@@ -55,19 +114,11 @@ const saveToWebDAV = async () => {
 
   try {
     await webdavStore.writeFile(activeNote.value, markdownContent.value)
-    console.log('Successfully saved to WebDAV')
+    console.log('成功保存到WebDAV')
   } catch (e) {
-    console.error('Failed to save to WebDAV:', e)
+    console.error('保存到WebDAV失败:', e)
   }
 }
-
-// Save content when edited (only locally)
-const saveNote = saveLocalNote
-
-// Markdown preview
-const markdownPreview = computed(() => {
-  return marked(markdownContent.value)
-})
 
 import { useWebDAVStore } from '@/stores/webdav'
 const webdavStore = useWebDAVStore()
@@ -90,7 +141,7 @@ onMounted(async () => {
       }
     }
   } catch (e) {
-    console.error('Failed to initialize WebDAV connection:', e)
+    console.error('初始化WebDAV连接失败:', e)
   }
 })
 
@@ -98,34 +149,34 @@ provide('webdav', computed(() => webdavStore.client))
 
 const router = useRouter()
 const navigateToConfig = () => {
-  console.log('Configure button clicked - router available:', !!router)
+  console.log('配置按钮点击 - router可用:', !!router)
   if (!router) {
-    console.error('Router is not available')
+    console.error('Router不可用')
     return
   }
   try {
-    console.log('Current route:', router.currentRoute.value.path)
+    console.log('当前路由:', router.currentRoute.value.path)
     router.push('/config').then(() => {
-      console.log('Navigation successful')
+      console.log('导航成功')
     }).catch(err => {
-      console.error('Navigation failed:', err)
+      console.error('导航失败:', err)
     })
   } catch (error) {
-    console.error('Navigation error:', error)
+    console.error('导航错误:', error)
   }
 }
 </script>
 
 <template>
   <div class="app-container">
-    <!-- Left sidebar - File navigation -->
+    <!-- 左侧边栏 - 文件导航 -->
     <div class="sidebar">
       <div class="sidebar-header"
         style="padding: 10px; display: flex; justify-content: space-between; align-items: center;">
-        <span>Notes</span>
+        <span>笔记</span>
         <button @click="navigateToConfig" class="config-btn"
           style="padding: 5px 10px; background: #646cff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          Configure
+          配置
         </button>
       </div>
       <div class="sidebar-tree">
@@ -133,7 +184,7 @@ const navigateToConfig = () => {
       </div>
     </div>
 
-    <!-- Main content area -->
+    <!-- 主内容区域 -->
     <div class="main-content">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -141,28 +192,22 @@ const navigateToConfig = () => {
         </transition>
       </router-view>
 
-      <!-- Editor (shown only when route is home) -->
+      <!-- 编辑器 (仅在首页路由显示) -->
       <div v-if="$route.path === '/'" class="editor">
         <div class="editor-header">
           <span>{{ activeNote }}</span>
           <div>
-            <button @click="isPreview = !isPreview" class="preview-btn">
-              {{ isPreview ? 'Edit' : 'Preview' }}
-            </button>
-            <button @click="() => { saveLocalNote(); saveToWebDAV(); }" class="save-btn">Save</button>
+            <button @click="() => { saveLocalNote(); saveToWebDAV(); }" class="save-btn">保存</button>
           </div>
         </div>
         <div class="editor-content">
-          <textarea v-show="!isPreview" v-model="markdownContent" class="markdown-editor"
-            placeholder="Write your markdown here..." @input="saveNote"
-            style="width: 100%; height: 100%; min-height: calc(100vh - 100px); padding: 1rem; box-sizing: border-box;"></textarea>
-          <div v-show="isPreview" class="markdown-preview" v-html="markdownPreview"></div>
+          <div class="markdown-editor-container">
+            <EditorContent :editor="editor" class="tiptap-editor" />
+          </div>
         </div>
       </div>
     </div>
-
   </div>
-
 </template>
 
 <style>
@@ -241,18 +286,78 @@ const navigateToConfig = () => {
   background-color: #45a049;
 }
 
-.markdown-editor {
+.markdown-editor-container {
   flex: 1;
   width: 100%;
-  border: none;
-  resize: none;
-  outline: none;
-  font-family: 'Consolas', monospace;
-  font-size: 14px;
+  height: 100%;
+  overflow: auto;
+}
+
+/* TipTap 编辑器样式 */
+.tiptap-editor {
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.6;
-  padding: 15px;
-  background-color: #fefefe;
   color: #333;
+}
+
+.wysiwyg-editor {
+  height: 100%;
+  outline: none;
+}
+
+.wysiwyg-editor h1 {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+}
+
+.wysiwyg-editor h2 {
+  font-size: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.wysiwyg-editor h3 {
+  font-size: 1.3em;
+  margin-bottom: 0.5em;
+}
+
+.wysiwyg-editor p {
+  margin-bottom: 1em;
+}
+
+.wysiwyg-editor ul,
+.wysiwyg-editor ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.wysiwyg-editor code {
+  background-color: #f0f0f0;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+
+.wysiwyg-editor pre {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 3px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.wysiwyg-editor blockquote {
+  border-left: 3px solid #ddd;
+  padding-left: 15px;
+  color: #666;
+  margin-left: 0;
+  margin-bottom: 1em;
+}
+
+.wysiwyg-editor img {
+  max-width: 100%;
 }
 
 .main-content {
@@ -266,61 +371,12 @@ const navigateToConfig = () => {
   line-height: 1.6;
   color: #333;
 }
-
-.markdown-preview h1,
-.markdown-preview h2,
-.markdown-preview h3 {
-  margin-top: 1em;
-  margin-bottom: 0.5em;
-}
-
-.markdown-preview code {
-  background-color: #f0f0f0;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: 'Consolas', monospace;
-}
-
-.markdown-preview pre {
-  background-color: #f5f5f5;
-  padding: 10px;
-  border-radius: 3px;
-  overflow-x: auto;
-}
-
-.markdown-preview blockquote {
-  border-left: 3px solid #ddd;
-  padding-left: 15px;
-  color: #666;
-  margin-left: 0;
-}
 </style>
 
 <style scoped>
 .editor-header>div {
   display: flex;
   gap: 0.5rem;
-}
-
-.preview-btn {
-  padding: 0.25rem 0.5rem;
-  background-color: var(--color-background-mute);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.preview-btn:hover {
-  background-color: var(--color-background-soft);
-}
-
-.markdown-preview {
-  padding: 1rem;
-  height: calc(100% - 3rem);
-  overflow-y: auto;
-  background-color: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 0 0 8px 8px;
 }
 
 .editor-content {
