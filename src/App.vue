@@ -14,11 +14,43 @@ import Image from '@tiptap/extension-image'
 import CodeBlock from '@tiptap/extension-code-block'
 import Placeholder from '@tiptap/extension-placeholder'
 
+// 表格相关扩展 - 使用命名导入
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+
 // Turndown 用于将HTML转换为Markdown
 import TurndownService from 'turndown'
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced'
+})
+
+// 添加表格支持到Turndown
+turndownService.addRule('tableCell', {
+  filter: ['th', 'td'],
+  replacement: function (content, node) {
+    return ' ' + content + ' |'
+  }
+})
+
+turndownService.addRule('tableRow', {
+  filter: 'tr',
+  replacement: function (content, node) {
+    let output = '|' + content
+    if (node.parentNode.nodeName.toLowerCase() === 'thead') {
+      output += '\n|' + Array(node.childNodes.length + 1).join(' --- |')
+    }
+    return output + '\n'
+  }
+})
+
+turndownService.addRule('table', {
+  filter: 'table',
+  replacement: function (content) {
+    return '\n\n' + content + '\n\n'
+  }
 })
 
 const activeNote = ref('Welcome.md')
@@ -29,6 +61,20 @@ const notes = ref({
   'Getting Started.md': '# Getting Started\n\n1. Create a new note\n2. Write in Markdown\n3. See the preview',
   'Features.md': '# Features\n\n- Markdown editing\n- Live preview\n- File navigation'
 })
+
+// 添加菜单按钮
+const addTableButton = ref(null)
+const showTableMenu = ref(false)
+const tableRows = ref(3)
+const tableCols = ref(3)
+
+// 创建表格
+const createTable = () => {
+  if (editor.value) {
+    editor.value.chain().focus().insertTable({ rows: tableRows.value, cols: tableCols.value }).run()
+    showTableMenu.value = false
+  }
+}
 
 // TipTap 编辑器实例
 const editor = useEditor({
@@ -43,6 +89,13 @@ const editor = useEditor({
     Placeholder.configure({
       placeholder: '开始编写您的笔记...',
     }),
+    // 添加表格扩展
+    Table.configure({
+      resizable: true,
+    }),
+    TableRow,
+    TableHeader,
+    TableCell,
   ],
   onUpdate: ({ editor }) => {
     // 将编辑器内容转换为HTML，然后使用turndown转换为Markdown
@@ -165,6 +218,112 @@ const navigateToConfig = () => {
     console.error('导航错误:', error)
   }
 }
+
+// 表格操作函数
+const addColumnBefore = () => {
+  editor.value?.chain().focus().addColumnBefore().run()
+}
+
+const addColumnAfter = () => {
+  editor.value?.chain().focus().addColumnAfter().run()
+}
+
+const deleteColumn = () => {
+  editor.value?.chain().focus().deleteColumn().run()
+}
+
+const addRowBefore = () => {
+  editor.value?.chain().focus().addRowBefore().run()
+}
+
+const addRowAfter = () => {
+  editor.value?.chain().focus().addRowAfter().run()
+}
+
+const deleteRow = () => {
+  editor.value?.chain().focus().deleteRow().run()
+}
+
+const deleteTable = () => {
+  editor.value?.chain().focus().deleteTable().run()
+}
+
+const toggleTableMenu = () => {
+  showTableMenu.value = !showTableMenu.value
+}
+
+// 点击外部关闭表格菜单
+const closeTableMenu = (event) => {
+  if (addTableButton.value && !addTableButton.value.contains(event.target) && showTableMenu.value) {
+    showTableMenu.value = false
+  }
+}
+
+// 编辑器工具栏功能
+const setHeading = (level) => {
+  editor.value?.chain().focus().toggleHeading({ level }).run()
+}
+
+const toggleBold = () => {
+  editor.value?.chain().focus().toggleBold().run()
+}
+
+const toggleItalic = () => {
+  editor.value?.chain().focus().toggleItalic().run()
+}
+
+const toggleStrike = () => {
+  editor.value?.chain().focus().toggleStrike().run()
+}
+
+const toggleCode = () => {
+  editor.value?.chain().focus().toggleCode().run()
+}
+
+const toggleCodeBlock = () => {
+  editor.value?.chain().focus().toggleCodeBlock().run()
+}
+
+const toggleBulletList = () => {
+  editor.value?.chain().focus().toggleBulletList().run()
+}
+
+const toggleOrderedList = () => {
+  editor.value?.chain().focus().toggleOrderedList().run()
+}
+
+const toggleBlockquote = () => {
+  editor.value?.chain().focus().toggleBlockquote().run()
+}
+
+const setHorizontalRule = () => {
+  editor.value?.chain().focus().setHorizontalRule().run()
+}
+
+const undo = () => {
+  editor.value?.chain().focus().undo().run()
+}
+
+const redo = () => {
+  editor.value?.chain().focus().redo().run()
+}
+
+const setLink = () => {
+  const url = window.prompt('URL')
+  if (url) {
+    editor.value?.chain().focus().setLink({ href: url }).run()
+  } else {
+    editor.value?.chain().focus().unsetLink().run()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeTableMenu)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeTableMenu)
+})
 </script>
 
 <template>
@@ -196,10 +355,206 @@ const navigateToConfig = () => {
       <div v-if="$route.path === '/'" class="editor">
         <div class="editor-header">
           <span>{{ activeNote }}</span>
-          <div>
+          <div class="editor-actions">
+            <!-- 表格按钮 -->
+            <div class="table-menu-container" ref="addTableButton">
+              <button @click="toggleTableMenu" class="action-btn">
+                插入表格
+              </button>
+              <div v-if="showTableMenu" class="table-menu">
+                <div class="table-menu-header">
+                  <span>表格大小: {{ tableRows }}x{{ tableCols }}</span>
+                </div>
+                <div class="table-size-controls">
+                  <div class="table-size-control">
+                    <label>行数:</label>
+                    <input type="number" v-model="tableRows" min="1" max="10" />
+                  </div>
+                  <div class="table-size-control">
+                    <label>列数:</label>
+                    <input type="number" v-model="tableCols" min="1" max="10" />
+                  </div>
+                </div>
+                <button @click="createTable" class="create-table-btn">创建表格</button>
+
+                <div class="table-operations" v-if="editor?.isActive('table')">
+                  <div class="table-operation-group">
+                    <button @click="addColumnBefore" class="table-op-btn">前插入列</button>
+                    <button @click="addColumnAfter" class="table-op-btn">后插入列</button>
+                    <button @click="deleteColumn" class="table-op-btn">删除列</button>
+                  </div>
+                  <div class="table-operation-group">
+                    <button @click="addRowBefore" class="table-op-btn">前插入行</button>
+                    <button @click="addRowAfter" class="table-op-btn">后插入行</button>
+                    <button @click="deleteRow" class="table-op-btn">删除行</button>
+                  </div>
+                  <button @click="deleteTable" class="table-op-btn delete-table">删除表格</button>
+                </div>
+              </div>
+            </div>
+
             <button @click="() => { saveLocalNote(); saveToWebDAV(); }" class="save-btn">保存</button>
           </div>
         </div>
+
+        <!-- 编辑器工具栏 -->
+        <div class="editor-toolbar">
+          <button
+            @click="setHeading(1)"
+            :class="{ 'is-active': editor?.isActive('heading', { level: 1 }) }"
+            class="toolbar-btn"
+            title="标题1">
+            H1
+          </button>
+          <button
+            @click="setHeading(2)"
+            :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }"
+            class="toolbar-btn"
+            title="标题2">
+            H2
+          </button>
+          <button
+            @click="setHeading(3)"
+            :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }"
+            class="toolbar-btn"
+            title="标题3">
+            H3
+          </button>
+          <span class="toolbar-divider"></span>
+          <button
+            @click="toggleBold"
+            :class="{ 'is-active': editor?.isActive('bold') }"
+            class="toolbar-btn"
+            title="粗体">
+            <strong>B</strong>
+          </button>
+          <button
+            @click="toggleItalic"
+            :class="{ 'is-active': editor?.isActive('italic') }"
+            class="toolbar-btn"
+            title="斜体">
+            <em>I</em>
+          </button>
+          <button
+            @click="toggleStrike"
+            :class="{ 'is-active': editor?.isActive('strike') }"
+            class="toolbar-btn"
+            title="删除线">
+            <s>S</s>
+          </button>
+          <button
+            @click="toggleCode"
+            :class="{ 'is-active': editor?.isActive('code') }"
+            class="toolbar-btn"
+            title="行内代码">
+            <code>&lt;/&gt;</code>
+          </button>
+          <span class="toolbar-divider"></span>
+          <button
+            @click="toggleBulletList"
+            :class="{ 'is-active': editor?.isActive('bulletList') }"
+            class="toolbar-btn"
+            title="无序列表">
+            • 列表
+          </button>
+          <button
+            @click="toggleOrderedList"
+            :class="{ 'is-active': editor?.isActive('orderedList') }"
+            class="toolbar-btn"
+            title="有序列表">
+            1. 列表
+          </button>
+          <button
+            @click="toggleBlockquote"
+            :class="{ 'is-active': editor?.isActive('blockquote') }"
+            class="toolbar-btn"
+            title="引用">
+            "引用"
+          </button>
+          <button
+            @click="toggleCodeBlock"
+            :class="{ 'is-active': editor?.isActive('codeBlock') }"
+            class="toolbar-btn"
+            title="代码块">
+            代码块
+          </button>
+          <span class="toolbar-divider"></span>
+          <button
+            @click="setLink"
+            :class="{ 'is-active': editor?.isActive('link') }"
+            class="toolbar-btn"
+            title="链接">
+            🔗
+          </button>
+          <button
+            @click="setHorizontalRule"
+            class="toolbar-btn"
+            title="水平线">
+            ―
+          </button>
+          <span class="toolbar-divider"></span>
+
+          <!-- 表格操作按钮 -->
+          <div class="table-toolbar-group" v-if="editor?.isActive('table')">
+            <button
+              @click="addRowBefore"
+              class="toolbar-btn"
+              title="在上方插入行">
+              ↑行
+            </button>
+            <button
+              @click="addRowAfter"
+              class="toolbar-btn"
+              title="在下方插入行">
+              ↓行
+            </button>
+            <button
+              @click="deleteRow"
+              class="toolbar-btn"
+              title="删除行">
+              ✕行
+            </button>
+            <button
+              @click="addColumnBefore"
+              class="toolbar-btn"
+              title="在左侧插入列">
+              ←列
+            </button>
+            <button
+              @click="addColumnAfter"
+              class="toolbar-btn"
+              title="在右侧插入列">
+              →列
+            </button>
+            <button
+              @click="deleteColumn"
+              class="toolbar-btn"
+              title="删除列">
+              ✕列
+            </button>
+            <button
+              @click="deleteTable"
+              class="toolbar-btn delete-table-btn"
+              title="删除表格">
+              删除表格
+            </button>
+          </div>
+
+          <span class="toolbar-divider" v-if="editor?.isActive('table')"></span>
+          <button
+            @click="undo"
+            class="toolbar-btn"
+            title="撤销">
+            ↩
+          </button>
+          <button
+            @click="redo"
+            class="toolbar-btn"
+            title="重做">
+            ↪
+          </button>
+        </div>
+
         <div class="editor-content">
           <div class="markdown-editor-container">
             <EditorContent :editor="editor" class="tiptap-editor" />
@@ -273,7 +628,71 @@ const navigateToConfig = () => {
   align-items: center;
 }
 
-.save-btn {
+/* 编辑器工具栏 */
+.editor-toolbar {
+  padding: 5px 10px;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.toolbar-btn {
+  background-color: transparent;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 5px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+}
+
+.toolbar-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.toolbar-btn.is-active {
+  background-color: #e6f7ff;
+  border-color: #91d5ff;
+  color: #1890ff;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #ddd;
+  margin: 0 5px;
+}
+
+/* 表格工具栏 */
+.table-toolbar-group {
+  display: flex;
+  gap: 5px;
+}
+
+.delete-table-btn {
+  background-color: #fff1f0;
+  border-color: #ffa39e;
+  color: #ff4d4f;
+}
+
+.delete-table-btn:hover {
+  background-color: #ff4d4f;
+  border-color: #ff4d4f;
+  color: white;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.save-btn, .action-btn {
   background-color: #4CAF50;
   color: white;
   border: none;
@@ -282,8 +701,16 @@ const navigateToConfig = () => {
   cursor: pointer;
 }
 
+.action-btn {
+  background-color: #2196F3;
+}
+
 .save-btn:hover {
   background-color: #45a049;
+}
+
+.action-btn:hover {
+  background-color: #0b7dda;
 }
 
 .markdown-editor-container {
@@ -291,6 +718,101 @@ const navigateToConfig = () => {
   width: 100%;
   height: 100%;
   overflow: auto;
+}
+
+/* 表格菜单样式 */
+.table-menu-container {
+  position: relative;
+}
+
+.table-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  z-index: 1000;
+  width: 200px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.table-menu-header {
+  margin-bottom: 10px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.table-size-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.table-size-control {
+  display: flex;
+  flex-direction: column;
+  width: 45%;
+}
+
+.table-size-control input {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+
+.create-table-btn {
+  width: 100%;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.create-table-btn:hover {
+  background-color: #45a049;
+}
+
+.table-operations {
+  border-top: 1px solid #eee;
+  padding-top: 10px;
+}
+
+.table-operation-group {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.table-op-btn {
+  background-color: #f1f1f1;
+  border: 1px solid #ddd;
+  padding: 3px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  flex: 1;
+  margin: 0 2px;
+}
+
+.table-op-btn:hover {
+  background-color: #e1e1e1;
+}
+
+.delete-table {
+  width: 100%;
+  background-color: #ff5252;
+  color: white;
+  margin-top: 5px;
+}
+
+.delete-table:hover {
+  background-color: #ff0000;
 }
 
 /* TipTap 编辑器样式 */
@@ -360,6 +882,39 @@ const navigateToConfig = () => {
   max-width: 100%;
 }
 
+/* 表格样式 */
+.wysiwyg-editor table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.wysiwyg-editor table td,
+.wysiwyg-editor table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+  position: relative;
+}
+
+.wysiwyg-editor table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+  text-align: left;
+}
+
+.wysiwyg-editor table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.wysiwyg-editor table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.wysiwyg-editor .selectedCell {
+  background-color: rgba(200, 200, 255, 0.4);
+}
+
 .main-content {
   flex: 1 1 100%;
   position: relative;
@@ -374,13 +929,8 @@ const navigateToConfig = () => {
 </style>
 
 <style scoped>
-.editor-header>div {
-  display: flex;
-  gap: 0.5rem;
-}
-
 .editor-content {
-  height: calc(100% - 3rem);
+  height: calc(100% - 6rem);
   position: relative;
 }
 </style>
