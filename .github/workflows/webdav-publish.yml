@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -48,14 +50,3 @@ jobs:
           webdav-password: ${{ secrets.WEBDAV_PASSWORD }}
           webdav-root: online/obsidian
           source-directory: ./dist
-
-#
-# !/bin/bash
-
-# 登录 GitHub CLI
-# gh auth login
-
-# 设置 WebDAV 相关 Secrets
-# gh secret set WEBDAV_URL --repo username/obsidian-notes --body "https://your-webdav-server.com"
-# gh secret set WEBDAV_USERNAME --repo username/obsidian-notes --body "your-username"
-# gh secret set WEBDAV_PASSWORD --repo username/obsidian-notes --body "your-password"
