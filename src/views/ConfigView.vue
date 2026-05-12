@@ -52,15 +52,34 @@ const testConnection = async () => {
   }
 }
 
-const saveConfig = () => {
+const goBack = () => {
+  router.push('/')
+}
+
+const saveConfig = async () => {
+  // 保存到两种 key，确保兼容性
   localStorage.setItem('webdavConfig', JSON.stringify(config.value))
+  localStorage.setItem('webdav_config', JSON.stringify(config.value))
+  
+  // 如果已连接，尝试重新连接以应用新配置
+  if (config.value.serverUrl && config.value.username && config.value.password) {
+    try {
+      await webdav.connect(config.value.serverUrl, config.value.username, config.value.password)
+    } catch (err) {
+      console.error('重新连接失败:', err)
+    }
+  }
+  
   router.push('/')
 }
 </script>
 
 <template>
   <div class="config-container">
-    <h1>WebDAV Configuration</h1>
+    <div class="config-header">
+      <button class="back-btn" @click="goBack">← 返回</button>
+      <h1>WebDAV 配置</h1>
+    </div>
     <form @submit.prevent="saveConfig">
       <div class="form-group">
         <label>Server URL</label>
@@ -146,9 +165,31 @@ const saveConfig = () => {
   padding: 20px;
 }
 
-h1 {
-  text-align: center;
+.config-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 30px;
+}
+
+.back-btn {
+  background: none;
+  border: 1px solid #ddd;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.back-btn:hover {
+  background-color: #f0f0f0;
+  border-color: #bbb;
+}
+
+.config-header h1 {
+  margin: 0;
 }
 
 .form-group {
