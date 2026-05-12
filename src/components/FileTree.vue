@@ -19,6 +19,28 @@ const error = ref(null)
 const sortBy = ref('name') // name, time, type, size
 const sortOrder = ref('asc') // asc, desc
 
+// 从 localStorage 加载排序设置
+const loadSortSettings = () => {
+  const saved = localStorage.getItem('fileSortSettings')
+  if (saved) {
+    try {
+      const settings = JSON.parse(saved)
+      if (settings.sortBy) sortBy.value = settings.sortBy
+      if (settings.sortOrder) sortOrder.value = settings.sortOrder
+    } catch (e) {
+      console.error('Failed to load sort settings:', e)
+    }
+  }
+}
+
+// 保存排序设置到 localStorage
+const saveSortSettings = () => {
+  localStorage.setItem('fileSortSettings', JSON.stringify({
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value
+  }))
+}
+
 // 常用页面
 const quickLinks = ref([
   { name: 'Welcome.md', path: '/obsidian/Welcome.md', icon: '🏠' },
@@ -71,6 +93,7 @@ const toggleSort = (field) => {
     sortBy.value = field
     sortOrder.value = 'asc'
   }
+  saveSortSettings()
 }
 
 // 排序后的文件列表
@@ -286,6 +309,7 @@ const formatTime = (timeStr) => {
 }
 
 onMounted(() => {
+  loadSortSettings()
   loadFiles()
   loadQuickLinks()
 })
