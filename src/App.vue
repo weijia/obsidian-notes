@@ -411,6 +411,35 @@ const navigateToConfig = () => {
   max-width: 100%;
 }
 
+/* 表格样式 */
+.wysiwyg-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+  font-size: 0.95em;
+}
+
+.wysiwyg-editor th,
+.wysiwyg-editor td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.wysiwyg-editor th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+  color: #333;
+}
+
+.wysiwyg-editor tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.wysiwyg-editor tr:hover {
+  background-color: #f0f0f0;
+}
+
 .main-content {
   flex: 1 1 100%;
   position: relative;
