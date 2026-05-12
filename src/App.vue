@@ -6,6 +6,41 @@ import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
 import { marked } from 'marked'
 
+// Sidebar 宽度调整相关
+const sidebarWidth = ref(250)
+const sidebarVisible = ref(true)
+const isResizing = ref(false)
+const minSidebarWidth = 150
+const maxSidebarWidth = 500
+
+const startResizing = (e) => {
+  isResizing.value = true
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+const stopResizing = () => {
+  isResizing.value = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+}
+
+const onResize = (e) => {
+  if (!isResizing.value) return
+  const newWidth = e.clientX
+  if (newWidth >= minSidebarWidth && newWidth <= maxSidebarWidth) {
+    sidebarWidth.value = newWidth
+  }
+}
+
+const toggleSidebar = () => {
+  sidebarVisible.value = !sidebarVisible.value
+}
+
+const toggleButtonLeft = computed(() => {
+  return sidebarVisible.value ? sidebarWidth.value + 4 + 'px' : '0px'
+})
+
 // TipTap 编辑器相关导入
 import { Editor, EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -318,10 +353,14 @@ const setLink = () => {
 }
 
 onMounted(() => {
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResizing)
   document.addEventListener('click', closeTableMenu)
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResizing)
   document.removeEventListener('click', closeTableMenu)
 })
 </script>
@@ -329,7 +368,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-container">
     <!-- 左侧边栏 - 文件导航 -->
-    <div class="sidebar">
+    <div class="sidebar" :style="{ width: sidebarVisible ? sidebarWidth + 'px' : '0px' }">
       <div class="sidebar-header"
         style="padding: 10px; display: flex; justify-content: space-between; align-items: center;">
         <span>笔记</span>
@@ -338,10 +377,18 @@ onBeforeUnmount(() => {
           配置
         </button>
       </div>
-      <div class="sidebar-tree">
+      <div class="sidebar-tree" v-show="sidebarVisible">
         <FileTree v-model="activeNote" @update="updateContent" />
       </div>
     </div>
+
+    <!-- 分隔条 -->
+    <div class="resizer" v-show="sidebarVisible" @mousedown="startResizing"></div>
+
+    <!-- 侧边栏切换按钮 -->
+    <button class="sidebar-toggle" :style="{ left: toggleButtonLeft }" @click="toggleSidebar" :title="sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'">
+      {{ sidebarVisible ? '◀' : '▶' }}
+    </button>
 
     <!-- 主内容区域 -->
     <div class="main-content">
@@ -573,14 +620,48 @@ onBeforeUnmount(() => {
 }
 
 .sidebar {
-  width: 250px;
   background-color: #1e1e1e;
   color: #d4d4d4;
   border-right: 1px solid #333;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  overflow: hidden; /* 禁止 sidebar 自己滚动 */
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.2s ease;
+}
+
+.resizer {
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.resizer:hover {
+  background-color: #646cff;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  background-color: #2d2d2d;
+  color: #d4d4d4;
+  border: 1px solid #444;
+  border-left: none;
+  padding: 10px 4px;
+  cursor: pointer;
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+  transition: left 0.2s ease, background-color 0.2s;
+}
+
+.sidebar-toggle:hover {
+  background-color: #646cff;
+  color: white;
 }
 
 .sidebar-header {
