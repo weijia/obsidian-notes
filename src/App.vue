@@ -6,6 +6,42 @@ import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
 import { marked } from 'marked'
 
+// Sidebar 宽度调整相关
+const sidebarWidth = ref(250)
+const isResizing = ref(false)
+const minSidebarWidth = 150
+const maxSidebarWidth = 500
+
+const startResizing = (e) => {
+  isResizing.value = true
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+const stopResizing = () => {
+  isResizing.value = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+}
+
+const onResize = (e) => {
+  if (!isResizing.value) return
+  const newWidth = e.clientX
+  if (newWidth >= minSidebarWidth && newWidth <= maxSidebarWidth) {
+    sidebarWidth.value = newWidth
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResizing)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResizing)
+})
+
 // TipTap 编辑器相关导入
 import { Editor, EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -170,7 +206,7 @@ const navigateToConfig = () => {
 <template>
   <div class="app-container">
     <!-- 左侧边栏 - 文件导航 -->
-    <div class="sidebar">
+    <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
       <div class="sidebar-header"
         style="padding: 10px; display: flex; justify-content: space-between; align-items: center;">
         <span>笔记</span>
@@ -183,6 +219,9 @@ const navigateToConfig = () => {
         <FileTree v-model="activeNote" @update="updateContent" />
       </div>
     </div>
+
+    <!-- 分隔条 -->
+    <div class="resizer" @mousedown="startResizing"></div>
 
     <!-- 主内容区域 -->
     <div class="main-content">
@@ -218,7 +257,6 @@ const navigateToConfig = () => {
 }
 
 .sidebar {
-  width: 250px;
   background-color: #1e1e1e;
   color: #d4d4d4;
   border-right: 1px solid #333;
@@ -226,6 +264,19 @@ const navigateToConfig = () => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden; /* 禁止 sidebar 自己滚动 */
+  flex-shrink: 0;
+}
+
+.resizer {
+  width: 5px;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.resizer:hover {
+  background-color: #646cff;
 }
 
 .sidebar-header {
