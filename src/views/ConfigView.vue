@@ -52,6 +52,10 @@ const testConnection = async () => {
   }
 }
 
+const goBack = () => {
+  router.push('/')
+}
+
 const saveConfig = async () => {
   // 保存到两种 key，确保兼容性
   localStorage.setItem('webdavConfig', JSON.stringify(config.value))
@@ -72,7 +76,10 @@ const saveConfig = async () => {
 
 <template>
   <div class="config-container">
-    <h1>WebDAV Configuration</h1>
+    <div class="config-header">
+      <button class="back-btn" @click="goBack">← 返回</button>
+      <h1>WebDAV 配置</h1>
+    </div>
     <form @submit.prevent="saveConfig">
       <div class="form-group">
         <label>Server URL</label>
@@ -158,9 +165,31 @@ const saveConfig = async () => {
   padding: 20px;
 }
 
-h1 {
-  text-align: center;
+.config-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 30px;
+}
+
+.back-btn {
+  background: none;
+  border: 1px solid #ddd;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.back-btn:hover {
+  background-color: #f0f0f0;
+  border-color: #bbb;
+}
+
+.config-header h1 {
+  margin: 0;
 }
 
 .form-group {
