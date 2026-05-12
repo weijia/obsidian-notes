@@ -126,21 +126,39 @@ const loadFiles = async () => {
     isLoading.value = true
     error.value = null
 
-    const config = JSON.parse(localStorage.getItem('webdavConfig'))
-    if (!config) {
-      error.value = 'WebDAV configuration not found. Please configure first.'
-      return
+    // 首先尝试使用 webdav store 中已保存的配置
+    if (!webdav.isConnected && webdav.serverUrl) {
+      console.log('尝试使用 store 中的配置自动连接到WebDAV...')
+      try {
+        await webdav.connect(webdav.serverUrl, webdav.username, webdav.password)
+        console.log('自动连接成功')
+      } catch (err) {
+        console.error('WebDAV自动连接失败:', err)
+        // 继续尝试从 localStorage 读取配置
+      }
     }
 
+    // 如果仍未连接，尝试从 localStorage 读取配置
     if (!webdav.isConnected) {
-      console.log('尝试自动连接到WebDAV...')
-      try {
-        const config = JSON.parse(localStorage.getItem('webdavConfig'))
-        if (!config) {
-          error.value = 'WebDAV configuration not found. Please configure first.'
-          return
+      // 尝试两种可能的 key 名称
+      let configStr = localStorage.getItem('webdav_config') || localStorage.getItem('webdavConfig')
+      let config = null
+      
+      if (configStr) {
+        try {
+          config = JSON.parse(configStr)
+        } catch (e) {
+          console.error('Failed to parse config:', e)
         }
+      }
+      
+      if (!config || !config.serverUrl) {
+        error.value = 'WebDAV configuration not found. Please configure first.'
+        return
+      }
 
+      console.log('尝试从 localStorage 连接到WebDAV...')
+      try {
         await webdav.connect(config.serverUrl, config.username, config.password)
         console.log('自动连接成功')
       } catch (err) {
@@ -150,7 +168,9 @@ const loadFiles = async () => {
       }
     }
 
-    await webdav.getDirectoryContents(config.directory)
+    // 获取目录内容
+    const targetPath = webdav.currentPath || webdav.basePath
+    await webdav.getDirectoryContents(targetPath)
 
     if (sortedFiles.value.length > 0 && !props.modelValue) {
       emit('update:modelValue', sortedFiles.value[0].path)

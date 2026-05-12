@@ -52,8 +52,20 @@ const testConnection = async () => {
   }
 }
 
-const saveConfig = () => {
+const saveConfig = async () => {
+  // 保存到两种 key，确保兼容性
   localStorage.setItem('webdavConfig', JSON.stringify(config.value))
+  localStorage.setItem('webdav_config', JSON.stringify(config.value))
+  
+  // 如果已连接，尝试重新连接以应用新配置
+  if (config.value.serverUrl && config.value.username && config.value.password) {
+    try {
+      await webdav.connect(config.value.serverUrl, config.value.username, config.value.password)
+    } catch (err) {
+      console.error('重新连接失败:', err)
+    }
+  }
+  
   router.push('/')
 }
 </script>
