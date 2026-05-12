@@ -88,8 +88,16 @@ turndownService.addRule('table', {
   }
 })
 
-const activeNote = ref('Welcome.md')
+const activeNote = ref(localStorage.getItem('lastOpenedFile') || 'Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
+
+// 保存上次打开的文件
+const saveLastOpenedFile = () => {
+  if (activeNote.value) {
+    localStorage.setItem('lastOpenedFile', activeNote.value)
+  }
+}
+
 // Sample notes data
 const notes = ref({
   'Welcome.md': '# Welcome to Obsidian-like Notes\n\nStart writing your notes here...',
@@ -153,6 +161,7 @@ onBeforeUnmount(() => {
 // Update content when active note changes
 const updateContent = async (newNote) => {
   activeNote.value = newNote
+  saveLastOpenedFile()
 
   // First check local notes
   if (notes.value[newNote]) {
