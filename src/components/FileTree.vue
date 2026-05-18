@@ -19,6 +19,19 @@ const error = ref(null)
 const sortBy = ref('name') // name, time, type, size
 const sortOrder = ref('asc') // asc, desc
 
+// 简洁模式（默认隐藏详细信息）
+const compactMode = ref(true)
+
+// 去除文件扩展名
+const displayName = (name) => {
+  if (!name) return name
+  const lastDot = name.lastIndexOf('.')
+  if (lastDot > 0) {
+    return name.substring(0, lastDot)
+  }
+  return name
+}
+
 // 从 localStorage 加载排序设置
 const loadSortSettings = () => {
   const saved = localStorage.getItem('fileSortSettings')
@@ -366,6 +379,7 @@ onMounted(() => {
         名称 {{ sortBy === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
       </button>
       <button 
+        v-if="!compactMode"
         :class="{ active: sortBy === 'time' }" 
         @click="toggleSort('time')"
         title="按时间排序"
@@ -380,11 +394,20 @@ onMounted(() => {
         类型 {{ sortBy === 'type' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
       </button>
       <button 
+        v-if="!compactMode"
         :class="{ active: sortBy === 'size' }" 
         @click="toggleSort('size')"
         title="按大小排序"
       >
         大小 {{ sortBy === 'size' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
+      </button>
+      <button 
+        class="compact-toggle"
+        :class="{ active: compactMode }"
+        @click="compactMode = !compactMode"
+        :title="compactMode ? '显示详细信息' : '隐藏详细信息'"
+      >
+        {{ compactMode ? '☰' : '☰' }}
       </button>
     </div>
 
@@ -404,7 +427,7 @@ onMounted(() => {
       </div>
       
       <!-- 文件列表表头 -->
-      <div class="file-list-header">
+      <div class="file-list-header" v-if="!compactMode">
         <span class="col-name">名称</span>
         <span class="col-size">大小</span>
         <span class="col-time">修改时间</span>
@@ -414,7 +437,7 @@ onMounted(() => {
         <li 
           v-for="file in sortedFiles" 
           :key="file.path"
-          :class="{ active: modelValue === file.path, directory: file.type === 'directory' }"
+          :class="{ active: modelValue === file.path, directory: file.type === 'directory', compact: compactMode }"
           @click="handleItemClick(file)"
           @contextmenu.prevent="addToQuickLinks(file)"
           :title="'右键点击添加到常用页面'"
@@ -423,10 +446,10 @@ onMounted(() => {
             <span class="icon">
               {{ file.type === 'directory' ? '📁' : '📄' }}
             </span>
-            {{ file.name }}
+            {{ compactMode ? displayName(file.name) : file.name }}
           </span>
-          <span class="col-size">{{ formatSize(file.size) }}</span>
-          <span class="col-time">{{ formatTime(file.lastmod) }}</span>
+          <span v-if="!compactMode" class="col-size">{{ formatSize(file.size) }}</span>
+          <span v-if="!compactMode" class="col-time">{{ formatTime(file.lastmod) }}</span>
         </li>
         <li v-if="sortedFiles.length === 0" class="empty-tip">
           当前目录为空
@@ -565,6 +588,18 @@ onMounted(() => {
   border-color: #646cff;
 }
 
+.compact-toggle {
+  margin-left: auto;
+  font-size: 1em !important;
+  padding: 4px 6px !important;
+}
+
+.compact-toggle.active {
+  background-color: #333;
+  color: white;
+  border-color: #333;
+}
+
 /* 路径导航 */
 .path-nav {
   display: flex;
@@ -627,6 +662,10 @@ onMounted(() => {
 
 .file-list li.directory {
   font-weight: 500;
+}
+
+.file-list li.compact {
+  padding: 6px 10px;
 }
 
 .col-name {
