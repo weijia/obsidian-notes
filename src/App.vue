@@ -5,6 +5,7 @@ import { createClient } from 'webdav'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
 import { marked } from 'marked'
+import { versionDisplay, buildTimeDisplay } from './version.js'
 
 // Sidebar 宽度调整相关
 const sidebarWidth = ref(250)
@@ -616,6 +617,12 @@ onBeforeUnmount(() => {
             <EditorContent :editor="editor" class="tiptap-editor" />
           </div>
         </div>
+        
+        <!-- 版本信息 -->
+        <div class="version-footer">
+          <span>版本: {{ versionDisplay }}</span>
+          <span v-if="versionDisplay !== 'dev'">发布时间: {{ buildTimeDisplay }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1020,7 +1027,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .editor-content {
-  height: calc(100% - 6rem);
+  height: calc(100% - 6.5rem);
   position: relative;
+}
+
+.version-footer {
+  padding: 6px 15px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #ddd;
+  font-size: 0.75em;
+  color: #888;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

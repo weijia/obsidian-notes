@@ -16,6 +16,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 需要完整历史来获取 tag 信息
+
+      # 获取版本信息
+      - name: Get version info
+        id: version
+        run: |
+          # 获取版本号
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          else
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          
+          # 获取 tag 的创建时间
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG_DATE=$(git log -1 --format=%ci $TAG 2>/dev/null || date -u +"%Y-%m-%d %H:%M:%S")
+          else
+            TAG_DATE=$(date -u +"%Y-%m-%d %H:%M:%S")
+          fi
+          echo "build_time=$TAG_DATE" >> $GITHUB_OUTPUT
+          
+          # 获取 commit SHA
+          echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          
+          echo "📦 Version: $TAG"
+          echo "🕐 Build Time: $TAG_DATE"
+          echo "🔨 Commit: ${GITHUB_SHA::7}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,6 +58,10 @@ jobs:
 
       - name: Build the project
         run: yarn build
+        env:
+          VITE_APP_VERSION: ${{ steps.version.outputs.tag }}
+          VITE_APP_BUILD_TIME: ${{ steps.version.outputs.build_time }}
+          VITE_APP_COMMIT_SHA: ${{ steps.version.outputs.sha }}
 
       - name: Upload to WebDAV
         uses: weijia/action-upload-webdav@master
