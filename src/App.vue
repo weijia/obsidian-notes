@@ -8,6 +8,8 @@ import { versionDisplay, buildTimeDisplay } from './version.js'
 
 // 当前视图状态：'files' 文件列表 | 'editor' 编辑器
 const currentView = ref('files')
+// 记住进入编辑器前的目录路径，点击"文件"按钮时恢复
+const previousDirPath = ref(null)
 
 // TipTap 编辑器相关导入
 import { Editor, EditorContent, useEditor } from '@tiptap/vue-3'
@@ -125,6 +127,8 @@ const editor = useEditor({
 const updateContent = async (newNote) => {
   activeNote.value = newNote
   saveLastOpenedFile()
+  // 记住当前目录路径，以便返回时恢复
+  previousDirPath.value = storageStore.backend.currentPath
   // 切换到编辑器视图
   currentView.value = 'editor'
 
@@ -223,6 +227,17 @@ onMounted(async () => {
 provide('storage', storageStore)
 
 const router = useRouter()
+// 从编辑器返回文件列表，恢复到之前的目录
+const goBackToFiles = async () => {
+  const backend = storageStore.backend
+  if (previousDirPath.value && backend.currentPath !== previousDirPath.value) {
+    backend.currentPath = previousDirPath.value
+    await storageStore.getDirectoryContents(previousDirPath.value)
+  }
+  previousDirPath.value = null
+  currentView.value = 'files'
+}
+
 const navigateToConfig = () => {
   console.log('配置按钮点击 - router可用:', !!router)
   if (!router) {
@@ -370,7 +385,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div class="files-tree-wrapper">
-            <FileTree v-model="activeNote" @update="updateContent" />
+            <FileTree :key="storageStore.backend.currentPath" v-model="activeNote" @update="updateContent" />
           </div>
         </div>
 
@@ -598,7 +613,7 @@ onBeforeUnmount(() => {
       <button
         class="nav-btn"
         :class="{ active: currentView === 'files' }"
-        @click="currentView = 'files'"
+        @click="goBackToFiles"
       >
         <span class="nav-icon">📁</span>
         <span class="nav-label">文件</span>
