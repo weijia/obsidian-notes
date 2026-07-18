@@ -407,16 +407,15 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="!backend.isConnected" class="connection-status">
+    <div v-if="isLoading" class="loading">Loading...</div>
+    <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-else-if="!backend.isConnected" class="connection-status">
       <div class="error">Storage connection not established</div>
       <button @click="testConnection" class="connect-btn">
         连接存储后端
       </button>
     </div>
-
-    <div v-if="isLoading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    <template v-else-if="backend.isConnected">
+    <template v-else>
       <div v-if="backend.currentPath !== backend.basePath" class="path-nav">
         <button @click="navigateUp">⬆ Up</button>
         <span>{{ backend.currentPath }}</span>
