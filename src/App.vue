@@ -68,10 +68,14 @@ turndownService.addRule('table', {
 const activeNote = ref(localStorage.getItem('lastOpenedFile') || 'Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
 
-// 保存上次打开的文件
+// 保存上次打开的文件和目录
 const saveLastOpenedFile = () => {
   if (activeNote.value) {
     localStorage.setItem('lastOpenedFile', activeNote.value)
+  }
+  const backend = storageStore.backend
+  if (backend && backend.currentPath) {
+    localStorage.setItem('lastOpenedPath', backend.currentPath)
   }
 }
 
@@ -200,6 +204,8 @@ const storageStore = useStorageStore()
 // Initialize storage connection from saved config
 onMounted(async () => {
   document.addEventListener('click', closeTableMenu)
+  // 恢复上次打开的目录路径
+  const savedPath = localStorage.getItem('lastOpenedPath')
   try {
     const type = storageStore.storageType
     if (type === 'gitee') {
@@ -210,7 +216,8 @@ onMounted(async () => {
           const connected = await storageStore.connect(config.token, config.owner, config.repo, config.branch)
           if (connected) {
             const b = storageStore.backend
-            await b.getDirectoryContents(b.currentPath || b.basePath)
+            const targetPath = savedPath || b.currentPath || b.basePath
+            await b.getDirectoryContents(targetPath)
           }
         }
       }
@@ -222,7 +229,8 @@ onMounted(async () => {
           const connected = await storageStore.connect(config.serverUrl, config.username, config.password)
           if (connected) {
             const b = storageStore.backend
-            await b.getDirectoryContents(b.currentPath || b.basePath)
+            const targetPath = savedPath || b.currentPath || b.basePath
+            await b.getDirectoryContents(targetPath)
           }
         }
       }

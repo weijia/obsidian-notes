@@ -39,12 +39,22 @@ export const useStorageStore = defineStore('storage', {
     },
 
     async getDirectoryContents(path) {
+      let result
       if (this.storageType === 'gitee') {
         const giteeStore = useGiteeStore()
-        return giteeStore.getDirectoryContents(path)
+        result = await giteeStore.getDirectoryContents(path)
+      } else {
+        const webdavStore = useWebDAVStore()
+        result = await webdavStore.getDirectoryContents(path)
       }
-      const webdavStore = useWebDAVStore()
-      return webdavStore.getDirectoryContents(path)
+      // 保存当前目录路径，刷新后恢复
+      if (result) {
+        const backend = this.backend
+        if (backend && backend.currentPath) {
+          localStorage.setItem('lastOpenedPath', backend.currentPath)
+        }
+      }
+      return result
     },
 
     async readFile(filePath) {
