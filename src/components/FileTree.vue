@@ -462,8 +462,10 @@ onMounted(() => {
 <style scoped>
 .file-tree {
   height: 100%;
-  padding: 10px;
+  padding: 12px 15px;
   overflow-y: auto;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 /* 常用页面区域 */
