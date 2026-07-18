@@ -10,6 +10,7 @@ onBeforeUnmount(() => { window.removeEventListener('resize', onResize) })
 import DOMPurify from 'dompurify'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
+import UpdateToast from './components/UpdateToast.vue'
 import { marked } from 'marked'
 import { versionDisplay, buildTimeDisplay } from './version.js'
 
@@ -744,6 +745,7 @@ onBeforeUnmount(() => {
         <span class="nav-label">编辑</span>
       </button>
     </nav>
+    <UpdateToast />
   </div>
 </template>
 
