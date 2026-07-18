@@ -20,8 +20,8 @@ export const useGiteeStore = defineStore('gitee', {
       owner: savedConfig.owner || '',
       repo: savedConfig.repo || '',
       branch: savedConfig.branch || 'master',
-      basePath: '/repo',
-      currentPath: '/repo',
+      basePath: '/',
+      currentPath: '/',
       files: [],
     }
   },
