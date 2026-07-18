@@ -1,8 +1,15 @@
-import { configure, fs } from '@zenfs/core'
-import { Gitee } from 'zen-fs-gitee'
+import { GiteeFS } from 'zen-fs-gitee'
+import { CachedFileSystem, IdbCacheStore } from 'zen-fs-cache'
+import { GiteeCacheAdapter } from '@/utils/giteeCacheAdapter'
 import { defineStore } from 'pinia'
 
-const MOUNT_POINT = '/repo'
+/**
+ * 缓存 key 前缀，按 仓库隔离。
+ * 格式: gitee:{owner}/{repo}:{branch}:
+ */
+function cachePrefix(owner, repo, branch) {
+  return `gitee:${owner}/${repo}:${branch}:`
+}
 
 export const useGiteeStore = defineStore('gitee', {
   state: () => {
@@ -13,8 +20,8 @@ export const useGiteeStore = defineStore('gitee', {
       owner: savedConfig.owner || '',
       repo: savedConfig.repo || '',
       branch: savedConfig.branch || 'master',
-      basePath: MOUNT_POINT,
-      currentPath: MOUNT_POINT,
+      basePath: '/repo',
+      currentPath: '/repo',
       files: [],
     }
   },
@@ -27,17 +34,23 @@ export const useGiteeStore = defineStore('gitee', {
         this.repo = repo
         this.branch = branch
 
-        await configure({
-          mounts: {
-            [MOUNT_POINT]: {
-              backend: Gitee,
-              token,
-              owner,
-              repo,
-              branch,
-            },
-          },
+        // 1. 创建 GiteeFS 实例（不通过 configure，直接实例化）
+        const giteeFs = new GiteeFS({ token, owner, repo, branch })
+        await giteeFs.init()
+        // 不预加载内容到内存 — 由 CachedFileSystem + IndexedDB 按需缓存
+
+        // 2. 用适配器包装为 CacheableFileSystem
+        const adapter = new GiteeCacheAdapter(giteeFs)
+
+        // 3. 用 IdbCacheStore（IndexedDB 持久化缓存）+ CachedFileSystem 包装
+        const cacheStore = new IdbCacheStore(cachePrefix(owner, repo, branch))
+        this._cachedFs = new CachedFileSystem(adapter, cacheStore, {
+          ttlMs: 2 * 60 * 1000, // 2 分钟内直接读缓存，不请求网络
         })
+
+        // 保存底层引用（适配器和 GiteeFS）以供 sync 等操作使用
+        this._adapter = adapter
+        this._giteeFs = giteeFs
 
         this.isConnected = true
 
@@ -46,7 +59,7 @@ export const useGiteeStore = defineStore('gitee', {
           JSON.stringify({ token, owner, repo, branch })
         )
 
-        await this.getDirectoryContents(MOUNT_POINT)
+        await this.getDirectoryContents(this.basePath)
         return true
       } catch (error) {
         console.error('Gitee 连接失败:', error)
@@ -78,21 +91,29 @@ export const useGiteeStore = defineStore('gitee', {
       const normalizedPath = path.startsWith('/') ? path : `/${path}`
 
       try {
-        const entries = fs.readdirSync(normalizedPath)
-        this.files = entries
-          .map((name) => {
-            const fullPath = normalizedPath === '/' ? `/${name}` : `${normalizedPath}/${name}`
-            const stat = fs.statSync(fullPath)
-            return {
+        // 通过 CachedFileSystem 读取目录（自动缓存）
+        const entries = await this._cachedFs.readdir(normalizedPath)
+
+        // 对每个条目获取 stat（也会被缓存）
+        const fileItems = []
+        for (const name of entries) {
+          const fullPath = normalizedPath === '/' ? `/${name}` : `${normalizedPath}/${name}`
+          try {
+            const stat = await this._cachedFs.stat(fullPath)
+            fileItems.push({
               basename: name,
               filename: fullPath,
+              path: fullPath,
               type: stat.isDirectory() ? 'directory' : 'file',
               lastmod: new Date(stat.mtimeMs).toISOString(),
               size: stat.size,
-            }
-          })
-          .filter((item) => item.basename !== '.DS_Store')
+            })
+          } catch {
+            // 个别条目 stat 失败则跳过
+          }
+        }
 
+        this.files = fileItems.filter((item) => item.basename !== '.DS_Store')
         this.currentPath = normalizedPath
         return this.files
       } catch (error) {
@@ -109,7 +130,7 @@ export const useGiteeStore = defineStore('gitee', {
       const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`
 
       try {
-        const data = fs.readFileSync(normalizedPath)
+        const data = await this._cachedFs.readFile(normalizedPath)
         return new TextDecoder().decode(data)
       } catch (error) {
         console.error(`读取文件失败(${normalizedPath}):`, error)
@@ -125,8 +146,11 @@ export const useGiteeStore = defineStore('gitee', {
       const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`
 
       try {
-        const encoder = new TextEncoder()
-        fs.writeFileSync(normalizedPath, encoder.encode(content))
+        await this._cachedFs.writeFile(normalizedPath, content)
+        // 等待 GiteeFS 的后台写操作完成
+        if (this._giteeFs?.sync) {
+          await this._giteeFs.sync()
+        }
         return true
       } catch (error) {
         console.error(`写入文件失败(${normalizedPath}):`, error)
@@ -136,11 +160,14 @@ export const useGiteeStore = defineStore('gitee', {
 
     reset() {
       this.isConnected = false
+      this._cachedFs = null
+      this._adapter = null
+      this._giteeFs = null
       this.token = ''
       this.owner = ''
       this.repo = ''
       this.branch = 'master'
-      this.currentPath = MOUNT_POINT
+      this.currentPath = this.basePath
       this.files = []
     },
   },

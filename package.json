@@ -46,6 +46,7 @@
     "vue-router": "^4.5.0",
     "webdav": "^5.8.0",
     "webdav-client": "^1.4.3",
+    "zen-fs-cache": "^1.0.1",
     "zen-fs-gitee": "^1.0.0"
   },
   "devDependencies": {
