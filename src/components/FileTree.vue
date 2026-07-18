@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, inject, nextTick, watch } from 'vue'
-import { useWebDAVStore } from '@/stores/webdav'
+import { useStorageStore } from '@/stores/storage'
 
 // 显式声明可能的注入依赖
 const appContext = inject('appContext', null)
@@ -11,7 +11,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'update'])
 
-const webdav = useWebDAVStore()
+const storageStore = useStorageStore()
+const backend = computed(() => storageStore.backend)
 const isLoading = ref(false)
 const error = ref(null)
 
@@ -111,11 +112,11 @@ const toggleSort = (field) => {
 
 // 排序后的文件列表
 const sortedFiles = computed(() => {
-  if (!webdav.isConnected) {
+  if (!backend.value.isConnected) {
     return []
   }
 
-  const filteredFiles = webdav.files
+  const filteredFiles = backend.value.files
     .filter(item => {
       return item.basename !== '.DS_Store'
     })
@@ -162,51 +163,45 @@ const loadFiles = async () => {
     isLoading.value = true
     error.value = null
 
-    // 首先尝试使用 webdav store 中已保存的配置
-    if (!webdav.isConnected && webdav.serverUrl) {
-      console.log('尝试使用 store 中的配置自动连接到WebDAV...')
-      try {
-        await webdav.connect(webdav.serverUrl, webdav.username, webdav.password)
-        console.log('自动连接成功')
-      } catch (err) {
-        console.error('WebDAV自动连接失败:', err)
-        // 继续尝试从 localStorage 读取配置
-      }
-    }
+    const b = backend.value
 
-    // 如果仍未连接，尝试从 localStorage 读取配置
-    if (!webdav.isConnected) {
-      // 尝试两种可能的 key 名称
-      let configStr = localStorage.getItem('webdav_config') || localStorage.getItem('webdavConfig')
-      let config = null
-      
-      if (configStr) {
+    // 尝试自动连接
+    if (!b.isConnected) {
+      const type = storageStore.storageType
+      if (type === 'gitee') {
+        const giteeConfig = JSON.parse(localStorage.getItem('gitee_config') || '{}')
+        if (giteeConfig.token && giteeConfig.owner && giteeConfig.repo) {
+          try {
+            await b.connect(giteeConfig.token, giteeConfig.owner, giteeConfig.repo, giteeConfig.branch)
+          } catch (err) {
+            error.value = `Gitee 自动连接失败: ${err.message}`
+            return
+          }
+        } else {
+          error.value = 'Gitee configuration not found. Please configure first.'
+          return
+        }
+      } else {
+        let configStr = localStorage.getItem('webdav_config') || localStorage.getItem('webdavConfig')
+        let config = null
+        if (configStr) {
+          try { config = JSON.parse(configStr) } catch (e) {}
+        }
+        if (!config || !config.serverUrl) {
+          error.value = 'WebDAV configuration not found. Please configure first.'
+          return
+        }
         try {
-          config = JSON.parse(configStr)
-        } catch (e) {
-          console.error('Failed to parse config:', e)
+          await b.connect(config.serverUrl, config.username, config.password)
+        } catch (err) {
+          error.value = `自动连接失败: ${err.message}`
+          return
         }
       }
-      
-      if (!config || !config.serverUrl) {
-        error.value = 'WebDAV configuration not found. Please configure first.'
-        return
-      }
-
-      console.log('尝试从 localStorage 连接到WebDAV...')
-      try {
-        await webdav.connect(config.serverUrl, config.username, config.password)
-        console.log('自动连接成功')
-      } catch (err) {
-        error.value = `自动连接失败: ${err.message}`
-        console.error('WebDAV自动连接失败:', err)
-        return
-      }
     }
 
-    // 获取目录内容
-    const targetPath = webdav.currentPath || webdav.basePath
-    await webdav.getDirectoryContents(targetPath)
+    const targetPath = b.currentPath || b.basePath
+    await b.getDirectoryContents(targetPath)
 
     if (sortedFiles.value.length > 0 && !props.modelValue) {
       emit('update:modelValue', sortedFiles.value[0].path)
@@ -231,10 +226,10 @@ const handleItemClick = async (file) => {
 
     if (isDirectory) {
       console.log('Navigating to directory:', file.path || file.filename)
-      await webdav.getDirectoryContents(file.path || file.filename)
+      await backend.value.getDirectoryContents(file.path || file.filename)
       // 确保UI更新
       await nextTick()
-      console.log('Directory navigation complete. New path:', webdav.currentPath)
+      console.log('Directory navigation complete. New path:', backend.value.currentPath)
     } else {
       console.log('Selecting file:', file.path)
       if (appContext) {
@@ -247,7 +242,7 @@ const handleItemClick = async (file) => {
     console.error('Failed to handle item click:', err)
     error.value = `操作失败: ${err.message}`
     // 恢复当前目录状态
-    await webdav.getDirectoryContents(webdav.currentPath)
+    await backend.value.getDirectoryContents(backend.value.currentPath)
   } finally {
     isLoading.value = false
   }
@@ -257,11 +252,11 @@ const navigateUp = async () => {
   try {
     isLoading.value = true
     error.value = ''
-    const currentPath = webdav.currentPath
+    const currentPath = backend.value.currentPath
     console.log('[FileTree] Current path:', currentPath)
 
     // Handle root path case
-    if (currentPath === '/') {
+    if (currentPath === backend.value.basePath) {
       error.value = 'Already at root directory'
       return
     }
@@ -273,8 +268,8 @@ const navigateUp = async () => {
     const parentPath = pathParts.length ? `/${pathParts.join('/')}` : '/'
 
     console.log('[FileTree] Navigating to parent:', parentPath)
-    await webdav.getDirectoryContents(parentPath)
-    console.log('[FileTree] Navigation complete. New path:', webdav.currentPath)
+    await backend.value.getDirectoryContents(parentPath)
+    console.log('[FileTree] Navigation complete. New path:', backend.value.currentPath)
 
     // 确保UI更新
     await nextTick()
@@ -283,7 +278,7 @@ const navigateUp = async () => {
     console.error('[FileTree] Navigation error:', err)
 
     // 恢复之前的状态
-    await webdav.getDirectoryContents(webdav.currentPath)
+    await backend.value.getDirectoryContents(backend.value.currentPath)
   } finally {
     isLoading.value = false
   }
@@ -293,10 +288,8 @@ const testConnection = async () => {
   try {
     isLoading.value = true
     error.value = ''
-    await webdav.testConnection()
-    if (webdav.client) {
-      await webdav.getDirectoryContents('/')
-    }
+    await storageStore.ensureConnected()
+    await backend.value.getDirectoryContents(backend.value.basePath)
   } catch (err) {
     error.value = `Connection failed: ${err.message}`
     console.error(err)
@@ -364,8 +357,8 @@ onMounted(() => {
     <!-- 文件列表头部 -->
     <div class="header">
       <span>📁 文件列表</span>
-      <div class="current-path" v-if="webdav.client && webdav.currentPath">
-        {{ webdav.currentPath }}
+      <div class="current-path" v-if="backend.isConnected && backend.currentPath">
+        {{ backend.currentPath }}
       </div>
     </div>
 
@@ -411,19 +404,19 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="!webdav.client" class="connection-status">
-      <div class="error">WebDAV connection not established</div>
+    <div v-if="!backend.isConnected" class="connection-status">
+      <div class="error">Storage connection not established</div>
       <button @click="testConnection" class="connect-btn">
-        Connect to WebDAV
+        连接存储后端
       </button>
     </div>
 
     <div v-if="isLoading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
-    <template v-else-if="webdav.client">
-      <div v-if="webdav.currentPath !== '/'" class="path-nav">
+    <template v-else-if="backend.isConnected">
+      <div v-if="backend.currentPath !== backend.basePath" class="path-nav">
         <button @click="navigateUp">⬆ Up</button>
-        <span>{{ webdav.currentPath }}</span>
+        <span>{{ backend.currentPath }}</span>
       </div>
       
       <!-- 文件列表表头 -->

@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue'
 import DOMPurify from 'dompurify'
-import { createClient } from 'webdav'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
 import { marked } from 'marked'
@@ -138,18 +137,18 @@ const updateContent = async (newNote) => {
     return
   }
 
-  // Try to fetch from WebDAV if available
-  if (webdavStore.client) {
+  // Try to fetch from storage if available
+  if (storageStore.isConnected) {
     try {
-      const content = await webdavStore.readFile(newNote)
+      const content = await storageStore.readFile(newNote)
       notes.value[newNote] = content
       markdownContent.value = content
       // 将Markdown转换为HTML，然后设置为编辑器内容
       const html = marked(content)
       editor.value?.commands.setContent(html)
     } catch (e) {
-      console.error('从WebDAV加载失败:', e)
-      const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或WebDAV服务器上未找到`
+      console.error('从存储加载失败:', e)
+      const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到`
       markdownContent.value = errorContent
       // 将Markdown转换为HTML，然后设置为编辑器内容
       const html = marked(errorContent)
@@ -171,45 +170,57 @@ const saveLocalNote = () => {
   }
 }
 
-// Save content to WebDAV
-const saveToWebDAV = async () => {
-  if (!activeNote.value || !webdavStore.isConnected) return
+// Save content to storage
+const saveToStorage = async () => {
+  if (!activeNote.value || !storageStore.isConnected) return
 
   try {
-    await webdavStore.writeFile(activeNote.value, markdownContent.value)
-    console.log('成功保存到WebDAV')
+    await storageStore.writeFile(activeNote.value, markdownContent.value)
+    console.log('成功保存到存储')
   } catch (e) {
-    console.error('保存到WebDAV失败:', e)
+    console.error('保存到存储失败:', e)
   }
 }
 
-import { useWebDAVStore } from '@/stores/webdav'
-const webdavStore = useWebDAVStore()
+import { useStorageStore } from '@/stores/storage'
+const storageStore = useStorageStore()
 
-// Initialize WebDAV connection from saved config
+// Initialize storage connection from saved config
 onMounted(async () => {
   document.addEventListener('click', closeTableMenu)
   try {
-    const savedConfig = localStorage.getItem('webdavConfig')
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig)
-      if (config.serverUrl && config.username && config.password) {
-        const connected = await webdavStore.connect(
-          config.serverUrl,
-          config.username,
-          config.password
-        )
-        if (connected) {
-          await webdavStore.getDirectoryContents(webdavStore.currentPath)
+    const type = storageStore.storageType
+    if (type === 'gitee') {
+      const savedConfig = localStorage.getItem('gitee_config')
+      if (savedConfig) {
+        const config = JSON.parse(savedConfig)
+        if (config.token && config.owner && config.repo) {
+          const connected = await storageStore.connect(config.token, config.owner, config.repo, config.branch)
+          if (connected) {
+            const b = storageStore.backend
+            await b.getDirectoryContents(b.currentPath || b.basePath)
+          }
+        }
+      }
+    } else {
+      const savedConfig = localStorage.getItem('webdavConfig')
+      if (savedConfig) {
+        const config = JSON.parse(savedConfig)
+        if (config.serverUrl && config.username && config.password) {
+          const connected = await storageStore.connect(config.serverUrl, config.username, config.password)
+          if (connected) {
+            const b = storageStore.backend
+            await b.getDirectoryContents(b.currentPath || b.basePath)
+          }
         }
       }
     }
   } catch (e) {
-    console.error('初始化WebDAV连接失败:', e)
+    console.error('初始化存储连接失败:', e)
   }
 })
 
-provide('webdav', computed(() => webdavStore.client))
+provide('storage', storageStore)
 
 const router = useRouter()
 const navigateToConfig = () => {
@@ -405,7 +416,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <button @click="() => { saveLocalNote(); saveToWebDAV(); }" class="save-btn">保存</button>
+              <button @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn">保存</button>
             </div>
           </div>
 
