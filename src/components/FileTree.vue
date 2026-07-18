@@ -118,7 +118,7 @@ const sortedFiles = computed(() => {
 
   const filteredFiles = backend.value.files
     .filter(item => {
-      return item.basename !== '.DS_Store'
+      return item.basename !== '.DS_Store' && !item.basename.startsWith('.')
     })
     .map(item => ({
       name: item.basename,
