@@ -17,8 +17,8 @@ const isLoading = ref(false)
 const error = ref(null)
 
 // 排序相关
-const sortBy = ref('name') // name, time, type, size
-const sortOrder = ref('asc') // asc, desc
+const sortBy = ref('time') // name, time, type, size
+const sortOrder = ref('desc') // desc: 最新修改的在前
 
 // 简洁模式（默认隐藏详细信息）
 const compactMode = ref(true)
@@ -137,7 +137,10 @@ const sortedFiles = computed(() => {
         comparison = a.name.localeCompare(b.name)
         break
       case 'time':
-        comparison = new Date(a.lastmod || 0) - new Date(b.lastmod || 0)
+        // 目录排在前面，同类型按修改时间排序
+        if (a.type === 'directory' && b.type !== 'directory') comparison = -1
+        else if (a.type !== 'directory' && b.type === 'directory') comparison = 1
+        else comparison = new Date(a.lastmod || 0) - new Date(b.lastmod || 0)
         break
       case 'type':
         // 目录排在前面
