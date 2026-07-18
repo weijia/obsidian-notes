@@ -1,5 +1,12 @@
 <script setup>
 import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue'
+
+// 响应式布局：桌面端分栏，移动端单面板
+const isMobile = ref(window.innerWidth < 768)
+const onResize = () => { isMobile.value = window.innerWidth < 768 }
+onMounted(() => { window.addEventListener('resize', onResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', onResize) })
+
 import DOMPurify from 'dompurify'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
@@ -127,10 +134,11 @@ const editor = useEditor({
 const updateContent = async (newNote) => {
   activeNote.value = newNote
   saveLastOpenedFile()
-  // 记住当前目录路径，以便返回时恢复
-  previousDirPath.value = storageStore.backend.currentPath
-  // 切换到编辑器视图
-  currentView.value = 'editor'
+  // 记住当前目录路径，以便返回时恢复（仅移动端）
+  if (isMobile.value) {
+    previousDirPath.value = storageStore.backend.currentPath
+    currentView.value = 'editor'
+  }
 
   // First check local notes
   if (notes.value[newNote]) {
@@ -376,240 +384,341 @@ onBeforeUnmount(() => {
 
       <!-- 首页: 文件列表 / 编辑器 视图切换 -->
       <template v-else>
-        <!-- 文件列表视图 -->
-        <div class="files-view" :class="{ 'view-hidden': currentView !== 'files' }">
-          <div class="files-header">
-            <span class="view-title">笔记</span>
-            <button @click="navigateToConfig" class="config-btn">
-              配置
-            </button>
+        <!-- 移动端：单面板切换模式 -->
+        <template v-if="isMobile">
+          <!-- 文件列表视图 -->
+          <div class="files-view" :class="{ 'view-hidden': currentView !== 'files' }">
+            <div class="files-header">
+              <span class="view-title">笔记</span>
+              <button @click="navigateToConfig" class="config-btn">
+                配置
+              </button>
+            </div>
+            <div class="files-tree-wrapper">
+              <FileTree :key="storageStore.backend.currentPath" v-model="activeNote" @update="updateContent" />
+            </div>
           </div>
-          <div class="files-tree-wrapper">
-            <FileTree :key="storageStore.backend.currentPath" v-model="activeNote" @update="updateContent" />
-          </div>
-        </div>
 
-        <!-- 编辑器视图 -->
-        <div class="editor" :class="{ 'view-hidden': currentView !== 'editor' }">
-          <div class="editor-header">
-            <span class="editor-title">{{ activeNote }}</span>
-            <div class="editor-actions">
-              <!-- 表格按钮 -->
-              <div class="table-menu-container" ref="addTableButton">
-                <button @click="toggleTableMenu" class="action-btn">
-                  插入表格
-                </button>
-                <div v-if="showTableMenu" class="table-menu">
-                  <div class="table-menu-header">
-                    <span>表格大小: {{ tableRows }}x{{ tableCols }}</span>
-                  </div>
-                  <div class="table-size-controls">
-                    <div class="table-size-control">
-                      <label>行数:</label>
-                      <input type="number" v-model="tableRows" min="1" max="10" />
+          <!-- 编辑器视图 -->
+          <div class="editor" :class="{ 'view-hidden': currentView !== 'editor' }">
+            <div class="editor-header">
+              <span class="editor-title">{{ activeNote }}</span>
+              <div class="editor-actions">
+                <!-- 表格按钮 -->
+                <div class="table-menu-container" ref="addTableButton">
+                  <button @click="toggleTableMenu" class="action-btn">
+                    插入表格
+                  </button>
+                  <div v-if="showTableMenu" class="table-menu">
+                    <div class="table-menu-header">
+                      <span>表格大小: {{ tableRows }}x{{ tableCols }}</span>
                     </div>
-                    <div class="table-size-control">
-                      <label>列数:</label>
-                      <input type="number" v-model="tableCols" min="1" max="10" />
+                    <div class="table-size-controls">
+                      <div class="table-size-control">
+                        <label>行数:</label>
+                        <input type="number" v-model="tableRows" min="1" max="10" />
+                      </div>
+                      <div class="table-size-control">
+                        <label>列数:</label>
+                        <input type="number" v-model="tableCols" min="1" max="10" />
+                      </div>
                     </div>
-                  </div>
-                  <button @click="createTable" class="create-table-btn">创建表格</button>
+                    <button @click="createTable" class="create-table-btn">创建表格</button>
 
-                  <div class="table-operations" v-if="editor?.isActive('table')">
-                    <div class="table-operation-group">
-                      <button @click="addColumnBefore" class="table-op-btn">前插入列</button>
-                      <button @click="addColumnAfter" class="table-op-btn">后插入列</button>
-                      <button @click="deleteColumn" class="table-op-btn">删除列</button>
+                    <div class="table-operations" v-if="editor?.isActive('table')">
+                      <div class="table-operation-group">
+                        <button @click="addColumnBefore" class="table-op-btn">前插入列</button>
+                        <button @click="addColumnAfter" class="table-op-btn">后插入列</button>
+                        <button @click="deleteColumn" class="table-op-btn">删除列</button>
+                      </div>
+                      <div class="table-operation-group">
+                        <button @click="addRowBefore" class="table-op-btn">前插入行</button>
+                        <button @click="addRowAfter" class="table-op-btn">后插入行</button>
+                        <button @click="deleteRow" class="table-op-btn">删除行</button>
+                      </div>
+                      <button @click="deleteTable" class="table-op-btn delete-table">删除表格</button>
                     </div>
-                    <div class="table-operation-group">
-                      <button @click="addRowBefore" class="table-op-btn">前插入行</button>
-                      <button @click="addRowAfter" class="table-op-btn">后插入行</button>
-                      <button @click="deleteRow" class="table-op-btn">删除行</button>
-                    </div>
-                    <button @click="deleteTable" class="table-op-btn delete-table">删除表格</button>
                   </div>
                 </div>
+
+                <button @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn">保存</button>
+              </div>
+            </div>
+
+            <!-- 编辑器工具栏 -->
+            <div class="editor-toolbar">
+              <button
+                @click="setHeading(1)"
+                :class="{ 'is-active': editor?.isActive('heading', { level: 1 }) }"
+                class="toolbar-btn"
+                title="标题1">
+                H1
+              </button>
+              <button
+                @click="setHeading(2)"
+                :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }"
+                class="toolbar-btn"
+                title="标题2">
+                H2
+              </button>
+              <button
+                @click="setHeading(3)"
+                :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }"
+                class="toolbar-btn"
+                title="标题3">
+                H3
+              </button>
+              <span class="toolbar-divider"></span>
+              <button
+                @click="toggleBold"
+                :class="{ 'is-active': editor?.isActive('bold') }"
+                class="toolbar-btn"
+                title="粗体">
+                <strong>B</strong>
+              </button>
+              <button
+                @click="toggleItalic"
+                :class="{ 'is-active': editor?.isActive('italic') }"
+                class="toolbar-btn"
+                title="斜体">
+                <em>I</em>
+              </button>
+              <button
+                @click="toggleStrike"
+                :class="{ 'is-active': editor?.isActive('strike') }"
+                class="toolbar-btn"
+                title="删除线">
+                <s>S</s>
+              </button>
+              <button
+                @click="toggleCode"
+                :class="{ 'is-active': editor?.isActive('code') }"
+                class="toolbar-btn"
+                title="行内代码">
+                <code>&lt;/&gt;</code>
+              </button>
+              <span class="toolbar-divider"></span>
+              <button
+                @click="toggleBulletList"
+                :class="{ 'is-active': editor?.isActive('bulletList') }"
+                class="toolbar-btn"
+                title="无序列表">
+                • 列表
+              </button>
+              <button
+                @click="toggleOrderedList"
+                :class="{ 'is-active': editor?.isActive('orderedList') }"
+                class="toolbar-btn"
+                title="有序列表">
+                1. 列表
+              </button>
+              <button
+                @click="toggleBlockquote"
+                :class="{ 'is-active': editor?.isActive('blockquote') }"
+                class="toolbar-btn"
+                title="引用">
+                "引用"
+              </button>
+              <button
+                @click="toggleCodeBlock"
+                :class="{ 'is-active': editor?.isActive('codeBlock') }"
+                class="toolbar-btn"
+                title="代码块">
+                代码块
+              </button>
+              <span class="toolbar-divider"></span>
+              <button
+                @click="setLink"
+                :class="{ 'is-active': editor?.isActive('link') }"
+                class="toolbar-btn"
+                title="链接">
+                🔗
+              </button>
+              <button
+                @click="setHorizontalRule"
+                class="toolbar-btn"
+                title="水平线">
+                ―
+              </button>
+              <span class="toolbar-divider"></span>
+
+              <!-- 表格操作按钮 -->
+              <div class="table-toolbar-group" v-if="editor?.isActive('table')">
+                <button
+                  @click="addRowBefore"
+                  class="toolbar-btn"
+                  title="在上方插入行">
+                  ↑行
+                </button>
+                <button
+                  @click="addRowAfter"
+                  class="toolbar-btn"
+                  title="在下方插入行">
+                  ↓行
+                </button>
+                <button
+                  @click="deleteRow"
+                  class="toolbar-btn"
+                  title="删除行">
+                  ✕行
+                </button>
+                <button
+                  @click="addColumnBefore"
+                  class="toolbar-btn"
+                  title="在左侧插入列">
+                  ←列
+                </button>
+                <button
+                  @click="addColumnAfter"
+                  class="toolbar-btn"
+                  title="在右侧插入列">
+                  →列
+                </button>
+                <button
+                  @click="deleteColumn"
+                  class="toolbar-btn"
+                  title="删除列">
+                  ✕列
+                </button>
+                <button
+                  @click="deleteTable"
+                  class="toolbar-btn delete-table-btn"
+                  title="删除表格">
+                  删除表格
+                </button>
               </div>
 
-              <button @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn">保存</button>
-            </div>
-          </div>
-
-          <!-- 编辑器工具栏 -->
-          <div class="editor-toolbar">
-            <button
-              @click="setHeading(1)"
-              :class="{ 'is-active': editor?.isActive('heading', { level: 1 }) }"
-              class="toolbar-btn"
-              title="标题1">
-              H1
-            </button>
-            <button
-              @click="setHeading(2)"
-              :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }"
-              class="toolbar-btn"
-              title="标题2">
-              H2
-            </button>
-            <button
-              @click="setHeading(3)"
-              :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }"
-              class="toolbar-btn"
-              title="标题3">
-              H3
-            </button>
-            <span class="toolbar-divider"></span>
-            <button
-              @click="toggleBold"
-              :class="{ 'is-active': editor?.isActive('bold') }"
-              class="toolbar-btn"
-              title="粗体">
-              <strong>B</strong>
-            </button>
-            <button
-              @click="toggleItalic"
-              :class="{ 'is-active': editor?.isActive('italic') }"
-              class="toolbar-btn"
-              title="斜体">
-              <em>I</em>
-            </button>
-            <button
-              @click="toggleStrike"
-              :class="{ 'is-active': editor?.isActive('strike') }"
-              class="toolbar-btn"
-              title="删除线">
-              <s>S</s>
-            </button>
-            <button
-              @click="toggleCode"
-              :class="{ 'is-active': editor?.isActive('code') }"
-              class="toolbar-btn"
-              title="行内代码">
-              <code>&lt;/&gt;</code>
-            </button>
-            <span class="toolbar-divider"></span>
-            <button
-              @click="toggleBulletList"
-              :class="{ 'is-active': editor?.isActive('bulletList') }"
-              class="toolbar-btn"
-              title="无序列表">
-              • 列表
-            </button>
-            <button
-              @click="toggleOrderedList"
-              :class="{ 'is-active': editor?.isActive('orderedList') }"
-              class="toolbar-btn"
-              title="有序列表">
-              1. 列表
-            </button>
-            <button
-              @click="toggleBlockquote"
-              :class="{ 'is-active': editor?.isActive('blockquote') }"
-              class="toolbar-btn"
-              title="引用">
-              "引用"
-            </button>
-            <button
-              @click="toggleCodeBlock"
-              :class="{ 'is-active': editor?.isActive('codeBlock') }"
-              class="toolbar-btn"
-              title="代码块">
-              代码块
-            </button>
-            <span class="toolbar-divider"></span>
-            <button
-              @click="setLink"
-              :class="{ 'is-active': editor?.isActive('link') }"
-              class="toolbar-btn"
-              title="链接">
-              🔗
-            </button>
-            <button
-              @click="setHorizontalRule"
-              class="toolbar-btn"
-              title="水平线">
-              ―
-            </button>
-            <span class="toolbar-divider"></span>
-
-            <!-- 表格操作按钮 -->
-            <div class="table-toolbar-group" v-if="editor?.isActive('table')">
+              <span class="toolbar-divider" v-if="editor?.isActive('table')"></span>
               <button
-                @click="addRowBefore"
+                @click="undo"
                 class="toolbar-btn"
-                title="在上方插入行">
-                ↑行
+                title="撤销">
+                ↩
               </button>
               <button
-                @click="addRowAfter"
+                @click="redo"
                 class="toolbar-btn"
-                title="在下方插入行">
-                ↓行
-              </button>
-              <button
-                @click="deleteRow"
-                class="toolbar-btn"
-                title="删除行">
-                ✕行
-              </button>
-              <button
-                @click="addColumnBefore"
-                class="toolbar-btn"
-                title="在左侧插入列">
-                ←列
-              </button>
-              <button
-                @click="addColumnAfter"
-                class="toolbar-btn"
-                title="在右侧插入列">
-                →列
-              </button>
-              <button
-                @click="deleteColumn"
-                class="toolbar-btn"
-                title="删除列">
-                ✕列
-              </button>
-              <button
-                @click="deleteTable"
-                class="toolbar-btn delete-table-btn"
-                title="删除表格">
-                删除表格
+                title="重做">
+                ↪
               </button>
             </div>
 
-            <span class="toolbar-divider" v-if="editor?.isActive('table')"></span>
-            <button
-              @click="undo"
-              class="toolbar-btn"
-              title="撤销">
-              ↩
-            </button>
-            <button
-              @click="redo"
-              class="toolbar-btn"
-              title="重做">
-              ↪
-            </button>
-          </div>
+            <div class="editor-content">
+              <div class="markdown-editor-container">
+                <EditorContent :editor="editor" class="tiptap-editor" />
+              </div>
+            </div>
 
-          <div class="editor-content">
-            <div class="markdown-editor-container">
-              <EditorContent :editor="editor" class="tiptap-editor" />
+            <!-- 版本信息 -->
+            <div class="version-footer">
+              <span>版本: {{ versionDisplay }}</span>
+              <span v-if="versionDisplay !== 'dev'">发布时间: {{ buildTimeDisplay }}</span>
             </div>
           </div>
+        </template>
 
-          <!-- 版本信息 -->
-          <div class="version-footer">
-            <span>版本: {{ versionDisplay }}</span>
-            <span v-if="versionDisplay !== 'dev'">发布时间: {{ buildTimeDisplay }}</span>
+        <!-- 桌面端：左右分栏布局 -->
+        <div v-if="!isMobile" class="desktop-layout">
+          <!-- 左侧文件列表 -->
+          <div class="desktop-sidebar">
+            <div class="files-header">
+              <span class="view-title">笔记</span>
+              <button @click="navigateToConfig" class="config-btn">配置</button>
+            </div>
+            <div class="desktop-sidebar-content">
+              <FileTree :key="storageStore.backend.currentPath" v-model="activeNote" @update="updateContent" />
+            </div>
+          </div>
+          <!-- 分隔线 -->
+          <div class="desktop-resizer"></div>
+          <!-- 右侧编辑器 -->
+          <div class="desktop-editor">
+            <div class="editor-header">
+              <span class="editor-title">{{ activeNote }}</span>
+              <div class="editor-actions">
+                <div class="table-menu-container" ref="addTableButton">
+                  <button @click="toggleTableMenu" class="action-btn">插入表格</button>
+                  <div v-if="showTableMenu" class="table-menu">
+                    <div class="table-menu-header">
+                      <span>表格大小: {{ tableRows }}x{{ tableCols }}</span>
+                    </div>
+                    <div class="table-size-controls">
+                      <div class="table-size-control">
+                        <label>行数:</label>
+                        <input type="number" v-model="tableRows" min="1" max="10" />
+                      </div>
+                      <div class="table-size-control">
+                        <label>列数:</label>
+                        <input type="number" v-model="tableCols" min="1" max="10" />
+                      </div>
+                    </div>
+                    <button @click="createTable" class="create-table-btn">创建表格</button>
+                    <div class="table-operations" v-if="editor?.isActive('table')">
+                      <div class="table-operation-group">
+                        <button @click="addColumnBefore" class="table-op-btn">前插入列</button>
+                        <button @click="addColumnAfter" class="table-op-btn">后插入列</button>
+                        <button @click="deleteColumn" class="table-op-btn">删除列</button>
+                      </div>
+                      <div class="table-operation-group">
+                        <button @click="addRowBefore" class="table-op-btn">前插入行</button>
+                        <button @click="addRowAfter" class="table-op-btn">后插入行</button>
+                        <button @click="deleteRow" class="table-op-btn">删除行</button>
+                      </div>
+                      <button @click="deleteTable" class="table-op-btn delete-table">删除表格</button>
+                    </div>
+                  </div>
+                </div>
+                <button @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn">保存</button>
+              </div>
+            </div>
+            <!-- 编辑器工具栏 -->
+            <div class="editor-toolbar">
+              <button @click="setHeading(1)" :class="{ 'is-active': editor?.isActive('heading', { level: 1 }) }" class="toolbar-btn" title="标题1">H1</button>
+              <button @click="setHeading(2)" :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }" class="toolbar-btn" title="标题2">H2</button>
+              <button @click="setHeading(3)" :class="{ 'is-active': editor?.isActive('heading', { level: 3 }) }" class="toolbar-btn" title="标题3">H3</button>
+              <span class="toolbar-divider"></span>
+              <button @click="toggleBold" :class="{ 'is-active': editor?.isActive('bold') }" class="toolbar-btn" title="粗体"><strong>B</strong></button>
+              <button @click="toggleItalic" :class="{ 'is-active': editor?.isActive('italic') }" class="toolbar-btn" title="斜体"><em>I</em></button>
+              <button @click="toggleStrike" :class="{ 'is-active': editor?.isActive('strike') }" class="toolbar-btn" title="删除线"><s>S</s></button>
+              <button @click="toggleCode" :class="{ 'is-active': editor?.isActive('code') }" class="toolbar-btn" title="行内代码"><code>&lt;/&gt;</code></button>
+              <span class="toolbar-divider"></span>
+              <button @click="toggleBulletList" :class="{ 'is-active': editor?.isActive('bulletList') }" class="toolbar-btn" title="无序列表">• 列表</button>
+              <button @click="toggleOrderedList" :class="{ 'is-active': editor?.isActive('orderedList') }" class="toolbar-btn" title="有序列表">1. 列表</button>
+              <button @click="toggleBlockquote" :class="{ 'is-active': editor?.isActive('blockquote') }" class="toolbar-btn" title="引用">"引用"</button>
+              <button @click="toggleCodeBlock" :class="{ 'is-active': editor?.isActive('codeBlock') }" class="toolbar-btn" title="代码块">代码块</button>
+              <span class="toolbar-divider"></span>
+              <button @click="setLink" :class="{ 'is-active': editor?.isActive('link') }" class="toolbar-btn" title="链接">🔗</button>
+              <button @click="setHorizontalRule" class="toolbar-btn" title="水平线">―</button>
+              <span class="toolbar-divider"></span>
+              <div class="table-toolbar-group" v-if="editor?.isActive('table')">
+                <button @click="addRowBefore" class="toolbar-btn" title="在上方插入行">↑行</button>
+                <button @click="addRowAfter" class="toolbar-btn" title="在下方插入行">↓行</button>
+                <button @click="deleteRow" class="toolbar-btn" title="删除行">✕行</button>
+                <button @click="addColumnBefore" class="toolbar-btn" title="在左侧插入列">←列</button>
+                <button @click="addColumnAfter" class="toolbar-btn" title="在右侧插入列">→列</button>
+                <button @click="deleteColumn" class="toolbar-btn" title="删除列">✕列</button>
+                <button @click="deleteTable" class="toolbar-btn delete-table-btn" title="删除表格">删除表格</button>
+              </div>
+              <span class="toolbar-divider" v-if="editor?.isActive('table')"></span>
+              <button @click="undo" class="toolbar-btn" title="撤销">↩</button>
+              <button @click="redo" class="toolbar-btn" title="重做">↪</button>
+            </div>
+            <div class="editor-content">
+              <div class="markdown-editor-container">
+                <EditorContent :editor="editor" class="tiptap-editor" />
+              </div>
+            </div>
+            <div class="version-footer">
+              <span>版本: {{ versionDisplay }}</span>
+              <span v-if="versionDisplay !== 'dev'">发布时间: {{ buildTimeDisplay }}</span>
+            </div>
           </div>
         </div>
       </template>
     </div>
 
-    <!-- 底部导航栏 (仅首页显示) -->
-    <nav v-if="$route.path === '/'" class="bottom-nav">
+    <!-- 底部导航栏 (仅移动端首页显示) -->
+    <nav v-if="$route.path === '/' && isMobile" class="bottom-nav">
       <button
         class="nav-btn"
         :class="{ active: currentView === 'files' }"
@@ -1092,6 +1201,53 @@ onBeforeUnmount(() => {
 
 .wysiwyg-editor .selectedCell {
   background-color: rgba(200, 200, 255, 0.4);
+}
+
+/* 桌面端左右分栏布局 */
+.desktop-layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+.desktop-sidebar {
+  width: 280px;
+  min-width: 200px;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #ddd;
+  background-color: #fafafa;
+  flex-shrink: 0;
+}
+
+.desktop-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.desktop-resizer {
+  width: 3px;
+  background-color: #e0e0e0;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.desktop-resizer:hover {
+  background-color: #646cff;
+}
+
+.desktop-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  color: #333;
 }
 </style>
 
