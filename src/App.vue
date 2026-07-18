@@ -399,6 +399,7 @@ onBeforeUnmount(() => {
           <div class="files-view" :class="{ 'view-hidden': currentView !== 'files' }">
             <div class="files-header">
               <span class="view-title">笔记</span>
+              <span class="version-badge" v-if="versionDisplay">v{{ versionDisplay }}</span>
               <button @click="navigateToConfig" class="config-btn">
                 配置
               </button>
@@ -618,11 +619,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <!-- 版本信息 -->
-            <div class="version-footer">
-              <span>版本: {{ versionDisplay }}</span>
-              <span v-if="versionDisplay !== 'dev'">发布时间: {{ buildTimeDisplay }}</span>
-            </div>
           </div>
         </template>
 
@@ -632,6 +628,7 @@ onBeforeUnmount(() => {
           <div class="desktop-sidebar">
             <div class="files-header">
               <span class="view-title">笔记</span>
+              <span class="version-badge" v-if="versionDisplay">v{{ versionDisplay }}</span>
               <button @click="navigateToConfig" class="config-btn">配置</button>
             </div>
             <div class="desktop-sidebar-content">
@@ -716,10 +713,6 @@ onBeforeUnmount(() => {
               <div class="markdown-editor-container">
                 <EditorContent :editor="editor" class="tiptap-editor" />
               </div>
-            </div>
-            <div class="version-footer">
-              <span>版本: {{ versionDisplay }}</span>
-              <span v-if="versionDisplay !== 'dev'">发布时间: {{ buildTimeDisplay }}</span>
             </div>
           </div>
         </div>
@@ -1269,15 +1262,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.version-footer {
-  padding: 6px 15px;
-  background-color: #f5f5f5;
-  border-top: 1px solid #ddd;
-  font-size: 0.75em;
-  color: #888;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
+.version-badge {
+  font-size: 0.7em;
+  color: #999;
+  background: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 8px;
 }
 </style>
