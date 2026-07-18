@@ -38,22 +38,6 @@ export const useGiteeStore = defineStore('gitee', {
         const giteeFs = new GiteeFS({ token, owner, repo, branch })
         await giteeFs.init()
 
-        // 调试: 检查 index 中加载了多少条目
-        console.log(`[Gitee] index 条目数: ${giteeFs.index.size}`)
-        for (const [p] of giteeFs.index) {
-          console.log(`[Gitee]   ${p}`)
-        }
-
-        // 直接测试 readdir
-        try {
-          const rootEntries = await giteeFs.readdir('/')
-          console.log(`[Gitee] readdir('/') 返回:`, rootEntries)
-        } catch (e) {
-          console.error(`[Gitee] readdir('/') 失败:`, e)
-        }
-
-        // 不预加载内容到内存 — 由 CachedFileSystem + IndexedDB 按需缓存
-
         // 2. 用适配器包装为 CacheableFileSystem
         const adapter = new GiteeCacheAdapter(giteeFs)
 
@@ -63,7 +47,7 @@ export const useGiteeStore = defineStore('gitee', {
           ttlMs: 2 * 60 * 1000, // 2 分钟内直接读缓存，不请求网络
         })
 
-        // 保存底层引用（适配器和 GiteeFS）以供 sync 等操作使用
+        // 保存底层引用
         this._adapter = adapter
         this._giteeFs = giteeFs
 
@@ -115,16 +99,19 @@ export const useGiteeStore = defineStore('gitee', {
           const fullPath = normalizedPath === '/' ? `/${name}` : `${normalizedPath}/${name}`
           try {
             const stat = await this._cachedFs.stat(fullPath)
+            // 注意: 从缓存返回的 stat 是普通对象，没有 isDirectory() 方法
+            // 需要用 mode 位运算判断
+            const isDir = (stat.mode & 0o170000) === 0o040000
             fileItems.push({
               basename: name,
               filename: fullPath,
               path: fullPath,
-              type: stat.isDirectory() ? 'directory' : 'file',
+              type: isDir ? 'directory' : 'file',
               lastmod: new Date(stat.mtimeMs).toISOString(),
               size: stat.size,
             })
-          } catch {
-            // 个别条目 stat 失败则跳过
+          } catch (e) {
+            console.warn(`stat 失败: ${fullPath}`, e)
           }
         }
 
@@ -162,7 +149,6 @@ export const useGiteeStore = defineStore('gitee', {
 
       try {
         await this._cachedFs.writeFile(normalizedPath, content)
-        // 等待 GiteeFS 的后台写操作完成
         if (this._giteeFs?.sync) {
           await this._giteeFs.sync()
         }
