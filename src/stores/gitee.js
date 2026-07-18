@@ -37,6 +37,21 @@ export const useGiteeStore = defineStore('gitee', {
         // 1. 创建 GiteeFS 实例（不通过 configure，直接实例化）
         const giteeFs = new GiteeFS({ token, owner, repo, branch })
         await giteeFs.init()
+
+        // 调试: 检查 index 中加载了多少条目
+        console.log(`[Gitee] index 条目数: ${giteeFs.index.size}`)
+        for (const [p] of giteeFs.index) {
+          console.log(`[Gitee]   ${p}`)
+        }
+
+        // 直接测试 readdir
+        try {
+          const rootEntries = await giteeFs.readdir('/')
+          console.log(`[Gitee] readdir('/') 返回:`, rootEntries)
+        } catch (e) {
+          console.error(`[Gitee] readdir('/') 失败:`, e)
+        }
+
         // 不预加载内容到内存 — 由 CachedFileSystem + IndexedDB 按需缓存
 
         // 2. 用适配器包装为 CacheableFileSystem
