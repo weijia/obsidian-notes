@@ -7,6 +7,15 @@ const onResize = () => { isMobile.value = window.innerWidth < 768 }
 onMounted(() => { window.addEventListener('resize', onResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', onResize) })
 
+// 浏览器返回按钮：从编辑器回到文件列表
+const onPopState = () => {
+  if (currentView.value === 'editor' && isMobile.value) {
+    goBackToFiles()
+  }
+}
+onMounted(() => { window.addEventListener('popstate', onPopState) })
+onBeforeUnmount(() => { window.removeEventListener('popstate', onPopState) })
+
 import DOMPurify from 'dompurify'
 import { RouterView, useRouter } from 'vue-router'
 import FileTree from './components/FileTree.vue'
@@ -143,6 +152,7 @@ const updateContent = async (newNote) => {
   if (isMobile.value) {
     previousDirPath.value = storageStore.backend.currentPath
     currentView.value = 'editor'
+    history.pushState({ view: 'editor' }, '')
   }
 
   // First check local notes
