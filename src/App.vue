@@ -78,6 +78,7 @@ turndownService.addRule('table', {
 const activeNote = ref(localStorage.getItem('lastOpenedFile') || 'Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
 const originalContent = ref('') // 加载文件时的原始内容，用于比对是否修改
+let isLoadingContent = false // 加载文件期间忽略 onUpdate，防止 turndown 转换差异导致误判为已修改
 
 // 保存上次打开的文件和目录
 const saveLastOpenedFile = () => {
@@ -136,6 +137,7 @@ const editor = useEditor({
     TableCell,
   ],
   onUpdate: ({ editor }) => {
+    if (isLoadingContent) return // 加载文件时忽略
     // 将编辑器内容转换为HTML，然后使用turndown转换为Markdown
     const html = editor.getHTML()
     markdownContent.value = turndownService.turndown(html)
@@ -152,49 +154,55 @@ const editor = useEditor({
 const updateContent = async (newNote) => {
   activeNote.value = newNote
   saveLastOpenedFile()
-  // 记住当前目录路径，以便返回时恢复（仅移动端）
-  if (isMobile.value) {
-    previousDirPath.value = storageStore.backend.currentPath
-    currentView.value = 'editor'
-    history.pushState({ view: 'editor' }, '')
-  }
-
-  // First check local notes
-  if (notes.value[newNote]) {
-    markdownContent.value = notes.value[newNote]
-    originalContent.value = notes.value[newNote]
-    // 将Markdown转换为HTML，然后设置为编辑器内容
-    const html = marked(notes.value[newNote])
-    editor.value?.commands.setContent(html)
-    return
-  }
-
-  // Try to fetch from storage if available
-  if (storageStore.isConnected) {
-    try {
-      const content = await storageStore.readFile(newNote)
-      notes.value[newNote] = content
-      markdownContent.value = content
-      originalContent.value = content
-      // 将Markdown转换为HTML，然后设置为编辑器内容
-      const html = marked(content)
-      editor.value?.commands.setContent(html)
-    } catch (e) {
-      console.error('从存储加载失败:', e)
-      const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到`
-      markdownContent.value = errorContent
-      originalContent.value = errorContent
-      // 将Markdown转换为HTML，然后设置为编辑器内容
-      const html = marked(errorContent)
-      editor.value?.commands.setContent(html)
+  isLoadingContent = true
+  try {
+    // 记住当前目录路径，以便返回时恢复（仅移动端）
+    if (isMobile.value) {
+      previousDirPath.value = storageStore.backend.currentPath
+      currentView.value = 'editor'
+      history.pushState({ view: 'editor' }, '')
     }
-  } else {
-    const notFoundContent = notes.value[newNote] || `# ${newNote}\n\n文件未找到`
-    markdownContent.value = notFoundContent
-    originalContent.value = notFoundContent
-    // 将Markdown转换为HTML，然后设置为编辑器内容
-    const html = marked(notFoundContent)
-    editor.value?.commands.setContent(html)
+
+    // First check local notes
+    if (notes.value[newNote]) {
+      markdownContent.value = notes.value[newNote]
+      // 将Markdown转换为HTML，然后设置为编辑器内容
+      const html = marked(notes.value[newNote])
+      editor.value?.commands.setContent(html)
+      // setContent 后用 turndown 回转作为基准，避免转换差异导致误判
+      originalContent.value = turndownService.turndown(editor.value.getHTML())
+      return
+    }
+
+    // Try to fetch from storage if available
+    if (storageStore.isConnected) {
+      try {
+        const content = await storageStore.readFile(newNote)
+        notes.value[newNote] = content
+        markdownContent.value = content
+        // 将Markdown转换为HTML，然后设置为编辑器内容
+        const html = marked(content)
+        editor.value?.commands.setContent(html)
+        originalContent.value = turndownService.turndown(editor.value.getHTML())
+      } catch (e) {
+        console.error('从存储加载失败:', e)
+        const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到`
+        markdownContent.value = errorContent
+        // 将Markdown转换为HTML，然后设置为编辑器内容
+        const html = marked(errorContent)
+        editor.value?.commands.setContent(html)
+        originalContent.value = turndownService.turndown(editor.value.getHTML())
+      }
+    } else {
+      const notFoundContent = notes.value[newNote] || `# ${newNote}\n\n文件未找到`
+      markdownContent.value = notFoundContent
+      // 将Markdown转换为HTML，然后设置为编辑器内容
+      const html = marked(notFoundContent)
+      editor.value?.commands.setContent(html)
+      originalContent.value = turndownService.turndown(editor.value.getHTML())
+    }
+  } finally {
+    isLoadingContent = false
   }
 }
 
