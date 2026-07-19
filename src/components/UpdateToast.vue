@@ -3,26 +3,36 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 const show = ref(false)
 const newVersion = ref('')
-let timer = null
+let intervalId = null
 let updateAvailable = false
 
 const checkUpdate = async () => {
   try {
+    // 加时间戳防止缓存
+    const ts = Date.now()
     const base = new URL('.', window.location.href).href
-    const res = await fetch(base + 'version.json', { cache: 'no-store' })
-    if (!res.ok) return
+    const url = base + 'version.json?t=' + ts
+    console.log('[UpdateToast] 检查更新:', url)
+    const res = await fetch(url, { cache: 'no-store' })
+    if (!res.ok) {
+      console.log('[UpdateToast] 请求失败:', res.status)
+      return
+    }
     const remote = await res.json()
-    // 比对版本号（忽略 dev 模式）
     const local = window.__APP_VERSION__ || ''
+    console.log('[UpdateToast] 本地版本:', local, '远程版本:', remote.version)
     if (remote.version && local && remote.version !== local) {
       if (!updateAvailable) {
         updateAvailable = true
         newVersion.value = remote.version
         show.value = true
+        console.log('[UpdateToast] 发现新版本!')
       }
+    } else {
+      console.log('[UpdateToast] 已是最新版本')
     }
-  } catch {
-    // 静默失败
+  } catch (e) {
+    console.log('[UpdateToast] 检查更新出错:', e)
   }
 }
 
@@ -33,17 +43,16 @@ const handleRefresh = () => {
 
 onMounted(() => {
   // 首次 5 秒后检测
-  timer = setTimeout(() => {
+  setTimeout(() => {
     checkUpdate()
     // 之后每 5 分钟轮询
-    timer = setInterval(checkUpdate, 5 * 60 * 1000)
+    intervalId = setInterval(checkUpdate, 5 * 60 * 1000)
   }, 5000)
 })
 
 onBeforeUnmount(() => {
-  if (timer) {
-    clearTimeout(timer)
-    clearInterval(timer)
+  if (intervalId) {
+    clearInterval(intervalId)
   }
 })
 </script>
