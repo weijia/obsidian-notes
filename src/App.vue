@@ -78,7 +78,8 @@ turndownService.addRule('table', {
 const activeNote = ref(localStorage.getItem('lastOpenedFile') || 'Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
 const originalContent = ref('') // 加载文件时的原始内容，用于比对是否修改
-let isLoadingContent = false // 加载文件期间忽略 onUpdate，防止 turndown 转换差异导致误判为已修改
+let isLoadingContent = false
+let pendingOriginalMarkdown = null // setContent 触发 onUpdate 时，用此次结果作为基准
 
 // 保存上次打开的文件和目录
 const saveLastOpenedFile = () => {
@@ -137,10 +138,15 @@ const editor = useEditor({
     TableCell,
   ],
   onUpdate: ({ editor }) => {
-    if (isLoadingContent) return // 加载文件时忽略
     // 将编辑器内容转换为HTML，然后使用turndown转换为Markdown
     const html = editor.getHTML()
-    markdownContent.value = turndownService.turndown(html)
+    const md = turndownService.turndown(html)
+    markdownContent.value = md
+    // 如果是 setContent 触发的，用此次结果作为基准
+    if (pendingOriginalMarkdown !== null) {
+      originalContent.value = md
+      pendingOriginalMarkdown = null
+    }
     saveLocalNote()
   },
   editorProps: {
@@ -168,9 +174,8 @@ const updateContent = async (newNote) => {
       markdownContent.value = notes.value[newNote]
       // 将Markdown转换为HTML，然后设置为编辑器内容
       const html = marked(notes.value[newNote])
+      pendingOriginalMarkdown = true
       editor.value?.commands.setContent(html)
-      // setContent 后用 turndown 回转作为基准，避免转换差异导致误判
-      originalContent.value = turndownService.turndown(editor.value.getHTML())
       return
     }
 
@@ -182,24 +187,24 @@ const updateContent = async (newNote) => {
         markdownContent.value = content
         // 将Markdown转换为HTML，然后设置为编辑器内容
         const html = marked(content)
+        pendingOriginalMarkdown = true
         editor.value?.commands.setContent(html)
-        originalContent.value = turndownService.turndown(editor.value.getHTML())
       } catch (e) {
         console.error('从存储加载失败:', e)
         const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到`
         markdownContent.value = errorContent
         // 将Markdown转换为HTML，然后设置为编辑器内容
         const html = marked(errorContent)
+        pendingOriginalMarkdown = true
         editor.value?.commands.setContent(html)
-        originalContent.value = turndownService.turndown(editor.value.getHTML())
       }
     } else {
       const notFoundContent = notes.value[newNote] || `# ${newNote}\n\n文件未找到`
       markdownContent.value = notFoundContent
       // 将Markdown转换为HTML，然后设置为编辑器内容
       const html = marked(notFoundContent)
+      pendingOriginalMarkdown = true
       editor.value?.commands.setContent(html)
-      originalContent.value = turndownService.turndown(editor.value.getHTML())
     }
   } finally {
     isLoadingContent = false
