@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
           <div class="files-view" :class="{ 'view-hidden': currentView !== 'files' }">
             <div class="files-header">
               <span class="view-title">笔记</span>
-              <span class="version-badge" v-if="versionDisplay">v{{ versionDisplay }}</span>
+              <span class="version-badge" v-if="versionDisplay">v{{ versionDisplay }}<span v-if="buildTimeDisplay" class="build-time"> {{ buildTimeDisplay }}</span></span>
               <button @click="navigateToConfig" class="config-btn">
                 配置
               </button>
@@ -647,7 +647,7 @@ onBeforeUnmount(() => {
           <div class="desktop-sidebar">
             <div class="files-header">
               <span class="view-title">笔记</span>
-              <span class="version-badge" v-if="versionDisplay">v{{ versionDisplay }}</span>
+              <span class="version-badge" v-if="versionDisplay">v{{ versionDisplay }}<span v-if="buildTimeDisplay" class="build-time"> {{ buildTimeDisplay }}</span></span>
               <button @click="navigateToConfig" class="config-btn">配置</button>
             </div>
             <div class="desktop-sidebar-content">
@@ -1295,5 +1295,11 @@ onBeforeUnmount(() => {
   padding: 1px 6px;
   border-radius: 8px;
   margin-left: 8px;
+}
+
+.build-time {
+  color: #bbb;
+  margin-left: 4px;
+  font-size: 0.9em;
 }
 </style>
