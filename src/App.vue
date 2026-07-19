@@ -77,6 +77,7 @@ turndownService.addRule('table', {
 
 const activeNote = ref(localStorage.getItem('lastOpenedFile') || 'Welcome.md')
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
+const originalContent = ref('') // 加载文件时的原始内容，用于比对是否修改
 
 // 保存上次打开的文件和目录
 const saveLastOpenedFile = () => {
@@ -88,6 +89,9 @@ const saveLastOpenedFile = () => {
     localStorage.setItem('lastOpenedPath', backend.currentPath)
   }
 }
+
+// 是否有未保存的修改
+const isDirty = computed(() => markdownContent.value !== originalContent.value)
 
 // Sample notes data
 const notes = ref({
@@ -158,6 +162,7 @@ const updateContent = async (newNote) => {
   // First check local notes
   if (notes.value[newNote]) {
     markdownContent.value = notes.value[newNote]
+    originalContent.value = notes.value[newNote]
     // 将Markdown转换为HTML，然后设置为编辑器内容
     const html = marked(notes.value[newNote])
     editor.value?.commands.setContent(html)
@@ -170,6 +175,7 @@ const updateContent = async (newNote) => {
       const content = await storageStore.readFile(newNote)
       notes.value[newNote] = content
       markdownContent.value = content
+      originalContent.value = content
       // 将Markdown转换为HTML，然后设置为编辑器内容
       const html = marked(content)
       editor.value?.commands.setContent(html)
@@ -177,6 +183,7 @@ const updateContent = async (newNote) => {
       console.error('从存储加载失败:', e)
       const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到`
       markdownContent.value = errorContent
+      originalContent.value = errorContent
       // 将Markdown转换为HTML，然后设置为编辑器内容
       const html = marked(errorContent)
       editor.value?.commands.setContent(html)
@@ -184,6 +191,7 @@ const updateContent = async (newNote) => {
   } else {
     const notFoundContent = notes.value[newNote] || `# ${newNote}\n\n文件未找到`
     markdownContent.value = notFoundContent
+    originalContent.value = notFoundContent
     // 将Markdown转换为HTML，然后设置为编辑器内容
     const html = marked(notFoundContent)
     editor.value?.commands.setContent(html)
@@ -203,6 +211,7 @@ const saveToStorage = async () => {
 
   try {
     await storageStore.writeFile(activeNote.value, markdownContent.value)
+    originalContent.value = markdownContent.value
     console.log('成功保存到存储')
   } catch (e) {
     console.error('保存到存储失败:', e)
@@ -461,7 +470,7 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
 
-                <button @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn">保存</button>
+                <button :disabled="!isDirty" @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn" :class="{ disabled: !isDirty }">保存</button>
               </div>
             </div>
 
@@ -684,7 +693,7 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
                 </div>
-                <button @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn">保存</button>
+                <button :disabled="!isDirty" @click="() => { saveLocalNote(); saveToStorage(); }" class="save-btn" :class="{ disabled: !isDirty }">保存</button>
               </div>
             </div>
             <!-- 编辑器工具栏 -->
@@ -1008,6 +1017,13 @@ onBeforeUnmount(() => {
 
 .save-btn:hover {
   background-color: #45a049;
+}
+
+.save-btn.disabled,
+.save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: #4CAF50;
 }
 
 .action-btn:hover {
