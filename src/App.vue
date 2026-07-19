@@ -142,10 +142,11 @@ const editor = useEditor({
     const html = editor.getHTML()
     const md = turndownService.turndown(html)
     markdownContent.value = md
-    // 如果是 setContent 触发的，用此次结果作为基准
+    // 如果是 setContent 触发的，用此次结果作为基准，不保存到 notes（保留原始 markdown）
     if (pendingOriginalMarkdown !== null) {
       originalContent.value = md
       pendingOriginalMarkdown = null
+      return
     }
     saveLocalNote()
   },
