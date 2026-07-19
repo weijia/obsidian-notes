@@ -21,7 +21,7 @@ const sortBy = ref('time') // name, time, type, size
 const sortOrder = ref('desc') // desc: 最新修改的在前
 
 // 简洁模式（默认隐藏详细信息）
-const compactMode = ref(true)
+const compactMode = ref(false)
 
 // 去除文件扩展名
 const displayName = (name) => {
