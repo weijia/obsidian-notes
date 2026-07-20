@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, provide, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 // 响应式布局：桌面端分栏，移动端单面板
 const isMobile = ref(window.innerWidth < 768)
@@ -76,6 +76,10 @@ turndownService.addRule('table', {
 })
 
 const activeNote = ref(localStorage.getItem('lastOpenedFile') || 'Welcome.md')
+const isRenaming = ref(false)
+const renamingName = ref('')
+const renameInput = ref(null)
+const renameInputDesktop = ref(null)
 const markdownContent = ref('# Welcome to Obsidian-like Notes\n\nStart writing your notes here...')
 const originalContent = ref('') // 加载文件时的原始内容，用于比对是否修改
 let isLoadingContent = false
@@ -278,6 +282,56 @@ provide('storage', storageStore)
 
 const router = useRouter()
 // 从编辑器返回文件列表，恢复到之前的目录
+// 重命名文件
+const startRename = () => {
+  renamingName.value = activeNote.value
+  isRenaming.value = true
+  nextTick(() => {
+    const input = renameInput.value || renameInputDesktop.value
+    if (input) {
+      input.focus()
+      // 选中文件名（不含扩展名）
+      const dotIndex = renamingName.value.lastIndexOf('.')
+      input.setSelectionRange(0, dotIndex > 0 ? dotIndex : renamingName.value.length)
+    }
+  })
+}
+
+const cancelRename = () => {
+  isRenaming.value = false
+}
+
+const confirmRename = async () => {
+  const newName = renamingName.value.trim()
+  isRenaming.value = false
+  if (!newName || newName === activeNote.value) return
+
+  const oldName = activeNote.value
+  if (!storageStore.isConnected) return
+
+  try {
+    // 读取旧文件内容
+    const content = markdownContent.value
+    // 写入新文件
+    await storageStore.writeFile(newName, content)
+    // 删除旧文件
+    await storageStore.deleteFile(oldName)
+    // 更新状态
+    notes.value[newName] = content
+    delete notes.value[oldName]
+    activeNote.value = newName
+    localStorage.setItem('lastOpenedFile', newName)
+    originalContent.value = markdownContent.value
+    // 刷新目录列表
+    const b = storageStore.backend
+    await storageStore.getDirectoryContents(b.currentPath || b.basePath)
+  } catch (e) {
+    console.error('重命名失败:', e)
+    alert('重命名失败: ' + e.message)
+    activeNote.value = oldName
+  }
+}
+
 const goBackToFiles = async () => {
   const backend = storageStore.backend
   if (previousDirPath.value && backend.currentPath !== previousDirPath.value) {
@@ -447,7 +501,16 @@ onBeforeUnmount(() => {
           <!-- 编辑器视图 -->
           <div class="editor" :class="{ 'view-hidden': currentView !== 'editor' }">
             <div class="editor-header">
-              <span class="editor-title clickable" @click="goBackToFiles" title="返回文件列表">{{ activeNote }}</span>
+              <input
+                v-if="isRenaming"
+                ref="renameInput"
+                v-model="renamingName"
+                class="editor-title rename-input"
+                @blur="confirmRename"
+                @keydown.enter="confirmRename"
+                @keydown.escape="cancelRename"
+              />
+              <span v-else class="editor-title clickable" @dblclick="startRename" title="双击重命名">{{ activeNote }}</span>
               <div class="editor-actions">
                 <!-- 表格按钮 -->
                 <div class="table-menu-container" ref="addTableButton">
@@ -675,7 +738,16 @@ onBeforeUnmount(() => {
           <!-- 右侧编辑器 -->
           <div class="desktop-editor">
             <div class="editor-header">
-              <span class="editor-title clickable" @click="goBackToFiles" title="恢复目录">{{ activeNote }}</span>
+              <input
+                v-if="isRenaming"
+                ref="renameInputDesktop"
+                v-model="renamingName"
+                class="editor-title rename-input"
+                @blur="confirmRename"
+                @keydown.enter="confirmRename"
+                @keydown.escape="cancelRename"
+              />
+              <span v-else class="editor-title clickable" @dblclick="startRename" title="双击重命名">{{ activeNote }}</span>
               <div class="editor-actions">
                 <div class="table-menu-container" ref="addTableButton">
                   <button @click="toggleTableMenu" class="action-btn">插入表格</button>
@@ -961,6 +1033,19 @@ onBeforeUnmount(() => {
 
 .editor-title.clickable:hover {
   color: #646cff;
+}
+
+.rename-input {
+  background: transparent;
+  border: 1px solid #646cff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  width: 200px;
+  max-width: 50vw;
 }
 
 /* 编辑器工具栏 */

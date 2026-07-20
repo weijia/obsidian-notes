@@ -75,6 +75,24 @@ export const useStorageStore = defineStore('storage', {
       return webdavStore.writeFile(filePath, content)
     },
 
+    async deleteFile(filePath) {
+      if (this.storageType === 'gitee') {
+        const giteeStore = useGiteeStore()
+        const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`
+        await giteeStore._cachedFs.unlink(normalizedPath)
+        // 清除缓存
+        if (giteeStore._cachedFs._cache) {
+          giteeStore._cachedFs._cache.delete(normalizedPath)
+        }
+      } else {
+        const webdavStore = useWebDAVStore()
+        const normalizedPath = filePath.startsWith(webdavStore.basePath)
+          ? filePath
+          : webdavStore.basePath + filePath
+        await webdavStore.client.deleteFile(normalizedPath)
+      }
+    },
+
     async testConnection() {
       if (this.storageType === 'gitee') {
         const giteeStore = useGiteeStore()
