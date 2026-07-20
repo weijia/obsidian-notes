@@ -33,5 +33,10 @@
 
 ## 版本与更新
 - 顶部"笔记"旁显示版本号和东八区构建时间
-- 构建时生成 `version.json`，页面每 5 分钟轮询检测新版本
-- 发现新版本时底部弹出提示，点击刷新更新
+- PWA 自动更新检测（vite-plugin-pwa + 自定义 Service Worker）
+  - `registerType: 'prompt'` 不自动激活，等待用户操作
+  - `injectManifest` 策略 + 自定义 `sw.js`：预缓存 + 清理旧缓存 + 监听 `SKIP_WAITING`
+  - 页面加载后 3 秒首次检测，每 5 分钟轮询 `reg.update()`
+  - SW `updatefound` → `statechange` → `installed` 时显示"新版本可用"提示
+  - 点击刷新发送 `SKIP_WAITING` 消息，新 SW 激活后自动 `location.reload()`
+  - `updateAvailable` 标志去重，避免重复弹出
