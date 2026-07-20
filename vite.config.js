@@ -6,6 +6,7 @@ import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // 读取 package.json 版本
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
@@ -16,6 +17,28 @@ export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
+    VitePWA({
+      registerType: 'prompt',          // prompt 模式，不自动更新
+      injectRegister: 'auto',          // 自动注入 SW 注册代码
+      strategies: 'injectManifest',    // 使用自定义 SW
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: {
+        injectionPoint: undefined,     // 禁用默认注入点，手动控制
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+      },
+      manifest: {
+        name: 'Obsidian Notes',
+        short_name: 'Obsidian Notes',
+        description: 'Obsidian-like Notes Editor',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
+        display: 'standalone',
+        scope: './',
+        start_url: './',
+        icons: [],
+      },
+    }),
     // 替换 index.html 中的版本占位符 + 生成 version.json
     {
       name: 'version-plugin',

@@ -6,48 +6,53 @@ const newVersion = ref('')
 let intervalId = null
 let updateAvailable = false
 
-const checkUpdate = async () => {
-  try {
-    // 加时间戳防止缓存
-    const ts = Date.now()
-    const base = new URL('.', window.location.href).href
-    const url = base + 'version.json?t=' + ts
-    console.log('[UpdateToast] 检查更新:', url)
-    const res = await fetch(url, { cache: 'no-store' })
-    if (!res.ok) {
-      console.log('[UpdateToast] 请求失败:', res.status)
-      return
-    }
-    const remote = await res.json()
-    const local = window.__APP_VERSION__ || ''
-    console.log('[UpdateToast] 本地版本:', local, '远程版本:', remote.version)
-    if (remote.version && local && remote.version !== local) {
-      if (!updateAvailable) {
-        updateAvailable = true
-        newVersion.value = remote.version
-        show.value = true
-        console.log('[UpdateToast] 发现新版本!')
+const handleUpdate = (reg) => {
+  reg.addEventListener('updatefound', () => {
+    const newWorker = reg.installing
+    if (!newWorker) return
+    newWorker.addEventListener('statechange', () => {
+      // 新 Worker 已安装且等待中，只通知一次
+      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        if (!updateAvailable) {
+          updateAvailable = true
+          console.log('[PWA] 新版本可用')
+          newVersion.value = '' // 不需要显示具体版本号，SW 变更即代表有新代码
+          show.value = true
+        }
       }
-    } else {
-      console.log('[UpdateToast] 已是最新版本')
-    }
-  } catch (e) {
-    console.log('[UpdateToast] 检查更新出错:', e)
-  }
+    })
+  })
 }
 
-const handleRefresh = () => {
+const handleRefresh = async () => {
+  const reg = await navigator.serviceWorker.ready
+  const newWorker = reg.waiting
+  if (newWorker) {
+    // 发送消息让新 SW 跳过等待 —— 需要自定义 SW 监听此消息
+    newWorker.postMessage({ type: 'SKIP_WAITING' })
+    // 新 SW 激活后刷新页面
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
+    })
+  }
   show.value = false
-  window.location.reload()
 }
 
 onMounted(() => {
-  // 首次 5 秒后检测
-  setTimeout(() => {
-    checkUpdate()
-    // 之后每 5 分钟轮询
-    intervalId = setInterval(checkUpdate, 5 * 60 * 1000)
-  }, 5000)
+  if (!('serviceWorker' in navigator)) {
+    console.log('[PWA] 浏览器不支持 Service Worker')
+    return
+  }
+  // 注册后监听更新
+  navigator.serviceWorker.ready.then((reg) => {
+    handleUpdate(reg)
+    // 3 秒后检查更新
+    setTimeout(() => reg.update().catch(console.error), 3000)
+  })
+  // 每 5 分钟轮询
+  intervalId = setInterval(() => {
+    navigator.serviceWorker.ready.then((reg) => reg.update().catch(console.error))
+  }, 5 * 60 * 1000)
 })
 
 onBeforeUnmount(() => {
@@ -60,8 +65,10 @@ onBeforeUnmount(() => {
 <template>
   <Transition name="toast-fade">
     <div v-if="show" class="update-toast">
-      <span class="toast-text">发现新版本 v{{ newVersion }}</span>
-      <button class="toast-btn" @click="handleRefresh">刷新</button>
+      <span class="toast-text">新版本可用</span>
+      <button class="toast-btn" @click="handleRefresh">
+        <span class="refresh-icon">↻</span> 点击刷新
+      </button>
     </div>
   </Transition>
 </template>
@@ -98,10 +105,17 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 13px;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .toast-btn:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+.refresh-icon {
+  font-size: 14px;
 }
 
 .toast-fade-enter-active,
