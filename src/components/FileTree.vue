@@ -217,6 +217,16 @@ const loadFiles = async () => {
   }
 }
 
+// 强制从远端刷新文件列表（清除缓存）
+const refreshFiles = async () => {
+  const b = backend.value
+  if (!b.isConnected) return
+  const targetPath = b.currentPath || b.basePath
+  // 清除当前目录缓存，强制从远端重新拉取
+  await storageStore.invalidatePath(targetPath)
+  await b.getDirectoryContents(targetPath)
+}
+
 const handleItemClick = async (file) => {
   try {
     console.log('Handling item click:', file)
@@ -360,8 +370,16 @@ onMounted(() => {
     <!-- 文件列表头部 -->
     <div class="header">
       <span>📁 文件列表</span>
-      <div class="current-path" v-if="backend.isConnected && backend.currentPath">
-        {{ backend.currentPath }}
+      <div class="header-actions">
+        <div class="current-path" v-if="backend.isConnected && backend.currentPath">
+          {{ backend.currentPath }}
+        </div>
+        <button
+          v-if="backend.isConnected"
+          class="refresh-btn"
+          @click="refreshFiles"
+          title="从远端刷新文件列表"
+        >↻</button>
       </div>
     </div>
 
@@ -545,6 +563,33 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  color: #666;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.refresh-btn:hover {
+  color: #646cff;
+  border-color: #646cff;
+}
+
+.refresh-btn:active {
+  transform: rotate(180deg);
 }
 
 .current-path {
