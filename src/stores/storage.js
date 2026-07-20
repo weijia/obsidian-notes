@@ -93,6 +93,14 @@ export const useStorageStore = defineStore('storage', {
       }
     },
 
+    async invalidatePath(...paths) {
+      if (this.storageType === 'gitee') {
+        const giteeStore = useGiteeStore()
+        await giteeStore.invalidatePath(...paths)
+      }
+      // WebDAV 无缓存，无需处理
+    },
+
     async testConnection() {
       if (this.storageType === 'gitee') {
         const giteeStore = useGiteeStore()

@@ -159,6 +159,12 @@ export const useGiteeStore = defineStore('gitee', {
       }
     },
 
+    async invalidatePath(...paths) {
+      if (this._cachedFs) {
+        await this._cachedFs.invalidate(...paths)
+      }
+    },
+
     reset() {
       this.isConnected = false
       this._cachedFs = null

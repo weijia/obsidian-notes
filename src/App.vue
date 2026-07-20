@@ -316,6 +316,8 @@ const confirmRename = async () => {
     await storageStore.writeFile(newName, content)
     // 删除旧文件
     await storageStore.deleteFile(oldName)
+    // 清除缓存（Gitee CachedFileSystem 需要手动 invalidate）
+    await storageStore.invalidatePath(oldName, newName)
     // 更新状态
     notes.value[newName] = content
     delete notes.value[oldName]
