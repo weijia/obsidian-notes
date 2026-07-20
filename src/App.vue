@@ -285,7 +285,9 @@ const goBackToFiles = async () => {
     await storageStore.getDirectoryContents(previousDirPath.value)
   }
   previousDirPath.value = null
-  currentView.value = 'files'
+  if (isMobile.value) {
+    currentView.value = 'files'
+  }
 }
 
 const navigateToConfig = () => {
@@ -445,7 +447,7 @@ onBeforeUnmount(() => {
           <!-- 编辑器视图 -->
           <div class="editor" :class="{ 'view-hidden': currentView !== 'editor' }">
             <div class="editor-header">
-              <span class="editor-title">{{ activeNote }}</span>
+              <span class="editor-title clickable" @click="goBackToFiles" title="返回文件列表">{{ activeNote }}</span>
               <div class="editor-actions">
                 <!-- 表格按钮 -->
                 <div class="table-menu-container" ref="addTableButton">
@@ -673,7 +675,7 @@ onBeforeUnmount(() => {
           <!-- 右侧编辑器 -->
           <div class="desktop-editor">
             <div class="editor-header">
-              <span class="editor-title">{{ activeNote }}</span>
+              <span class="editor-title clickable" @click="goBackToFiles" title="恢复目录">{{ activeNote }}</span>
               <div class="editor-actions">
                 <div class="table-menu-container" ref="addTableButton">
                   <button @click="toggleTableMenu" class="action-btn">插入表格</button>
@@ -950,6 +952,15 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.editor-title.clickable {
+  cursor: pointer;
+  border-bottom: 1px dashed #999;
+}
+
+.editor-title.clickable:hover {
+  color: #646cff;
 }
 
 /* 编辑器工具栏 */
