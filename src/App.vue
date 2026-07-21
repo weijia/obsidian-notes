@@ -196,7 +196,12 @@ const updateContent = async (newNote) => {
         editor.value?.commands.setContent(html)
       } catch (e) {
         console.error('从存储加载失败:', e)
-        const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到`
+        // 文件可能已在远端被删除或重命名，清除本地缓存
+        delete notes.value[newNote]
+        if (localStorage.getItem('lastOpenedFile') === newNote) {
+          localStorage.removeItem('lastOpenedFile')
+        }
+        const errorContent = `# 加载 ${newNote} 出错\n\n文件在本地或存储服务器上未找到，可能在远端已被删除或重命名。\n请点击左侧文件列表中的其他文件。`
         markdownContent.value = errorContent
         // 将Markdown转换为HTML，然后设置为编辑器内容
         const html = marked(errorContent)

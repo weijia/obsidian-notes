@@ -217,13 +217,13 @@ const loadFiles = async () => {
   }
 }
 
-// 强制从远端刷新文件列表（清除缓存）
+// 强制从远端刷新文件列表（清除所有缓存）
 const refreshFiles = async () => {
   const b = backend.value
   if (!b.isConnected) return
   const targetPath = b.currentPath || b.basePath
-  // 清除当前目录缓存，强制从远端重新拉取
-  await storageStore.invalidatePath(targetPath)
+  // 清除所有缓存，强制从远端重新拉取
+  await storageStore.clearCache()
   await b.getDirectoryContents(targetPath)
 }
 

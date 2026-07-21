@@ -165,6 +165,12 @@ export const useGiteeStore = defineStore('gitee', {
       }
     },
 
+    async clearCache() {
+      if (this._cachedFs && this._cachedFs.store) {
+        await this._cachedFs.store.clear()
+      }
+    },
+
     reset() {
       this.isConnected = false
       this._cachedFs = null

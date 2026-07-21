@@ -101,6 +101,13 @@ export const useStorageStore = defineStore('storage', {
       // WebDAV 无缓存，无需处理
     },
 
+    async clearCache() {
+      if (this.storageType === 'gitee') {
+        const giteeStore = useGiteeStore()
+        await giteeStore.clearCache()
+      }
+    },
+
     async testConnection() {
       if (this.storageType === 'gitee') {
         const giteeStore = useGiteeStore()
