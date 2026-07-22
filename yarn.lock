@@ -9357,10 +9357,10 @@ zen-fs-cache@^1.0.1:
   resolved "https://registry.npmjs.org/zen-fs-cache/-/zen-fs-cache-1.0.1.tgz"
   integrity sha512-Dl3PJYxxJ8wMWOQhL+xXgyyJyxrVKSTXLmls18zbWF18DDJiI9WZhjWt7shnnj+AnkY25FoHacXxEPxrKN6Qsg==
 
-zen-fs-gitee@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/zen-fs-gitee/-/zen-fs-gitee-1.0.0.tgz"
-  integrity sha512-Vf7l4jnqbZuHbaeYfrPwn9eA8hjZp7jUwS66AqqA6AbsFe0vToV6zGBmKTVmgZUrrTT2Fb9JYqasZDImudVARA==
+zen-fs-gitee@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.npmjs.org/zen-fs-gitee/-/zen-fs-gitee-1.1.1.tgz"
+  integrity sha512-OOr/X0Qjtw5TkoTIEtMXJo+nCJwPvdqh7vry61kjwwOqQqpa3CwqumyWKZp8Lg0eP4ab0tcSYo0F7AQvGGCmYw==
 
 zwitch@^2.0.0, zwitch@^2.0.4:
   version "2.0.4"

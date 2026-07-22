@@ -49,7 +49,7 @@
     "webdav-client": "^1.4.3",
     "workbox-precaching": "^7.4.1",
     "zen-fs-cache": "^1.0.1",
-    "zen-fs-gitee": "^1.0.0"
+    "zen-fs-gitee": "^1.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
