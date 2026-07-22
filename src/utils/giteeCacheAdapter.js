@@ -16,8 +16,13 @@ export class GiteeCacheAdapter {
     this._revision++
   }
 
-  // --- getRevision: 用递增版本号做廉价重新验证 ---
-  async getRevision() {
+  // --- getRevision: 返回文件的 blob SHA，用于缓存重新验证 ---
+  // zen-fs-cache 在 readFile/readdir/stat 后检查 revision
+  // 返回 SHA 变化说明远端文件已修改，缓存应失效
+  async getRevision(path) {
+    const sha = this._giteeFs.getFileSha(path)
+    if (sha !== undefined) return sha
+    // 降级到全局递增版本号
     return this._revision
   }
 
